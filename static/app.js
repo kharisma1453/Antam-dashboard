@@ -178,18 +178,32 @@ async function loadData() {
     rawColumns = json.data;
     fullData = json;
 
-    // Initial render: all data
+    // Initial render: last 1 year (from latest date)
     allRecords = getFilteredRecords(null, null);
-    const summary = computeSummary(allRecords);
+    const fullSummary = computeSummary(allRecords);
+    const endDate = new Date(fullSummary.last_date);
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - 365);
+    const startStr = startDate.toISOString().slice(0, 10);
 
-    document.getElementById('start-date').value = summary.first_date;
-    document.getElementById('end-date').value = summary.last_date;
+    // Set date inputs to 1-year window
+    document.getElementById('start-date').value = startStr;
+    document.getElementById('end-date').value = fullSummary.last_date;
+
+    // Filter to 1 year and render
+    const records = getFilteredRecords(startStr, fullSummary.last_date);
+    const summary = computeSummary(records);
+
     document.getElementById('last-update').textContent = summary.last_date;
     document.getElementById('data-range').textContent =
       `${summary.first_date} → ${summary.last_date} (${summary.total_days} hari)`;
     updateKPIs(summary);
-    renderChart(allRecords, getActiveSizes());
+    renderChart(records, getActiveSizes());
     renderMonthly(allRecords);
+
+    // Highlight 1T button as active
+    document.querySelectorAll('.quick-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelector('.quick-btn[data-range="365"]')?.classList.add('active');
   } catch (e) {
     console.error('Load failed', e);
   }
