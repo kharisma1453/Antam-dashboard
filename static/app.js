@@ -1,6 +1,6 @@
 // Antam Gold Dashboard - frontend logic (with buyback support)
 const SIZES = [0.5, 1, 2, 3, 5, 10, 25, 50, 100, 250, 500, 1000];
-const DEFAULT_SIZES = [1, 5, 10, 100];
+const DEFAULT_SIZES = [1];
 
 let chart = null;
 let fullData = null;
