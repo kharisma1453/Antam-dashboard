@@ -216,12 +216,12 @@ function updateKPIs(s) {
   deltaEl.className = 'kpi-delta ' + (s.change_idr >= 0 ? 'positive' : 'negative');
 
   // Buyback (1g)
-  document.getElementById('kpi-buyback').textContent = idr(s.last_buyback);
+  document.getElementById('kpi-buyback').textContent = s.buyback_1g != null ? idr(s.buyback_1g) : '—';
   document.getElementById('kpi-buyback-sub').textContent = 'harga beli balik';
 
   // Spread
-  document.getElementById('kpi-spread').textContent = idr(s.spread);
-  document.getElementById('kpi-spread-pct').textContent = (s.spread_pct >= 0 ? '+' : '') + s.spread_pct.toFixed(2) + '% dari buyback';
+  document.getElementById('kpi-spread').textContent = s.spread_idr != null ? idr(s.spread_idr) : '—';
+  document.getElementById('kpi-spread-pct').textContent = s.spread_pct != null ? (s.spread_pct >= 0 ? '+' : '') + s.spread_pct.toFixed(2) + '% dari buyback' : '—';
   document.getElementById('kpi-spread-pct').className = 'kpi-delta muted';
 
   // Generic KPIs
