@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Old server artifacts (no longer needed for Vercel static)
+generate_sample_data.py
+fetch_real_data.py
+server.py
+templates/
+
+# Cron output logs
+*.log
+
+# Screenshots (dev only)
+screenshot-*.png

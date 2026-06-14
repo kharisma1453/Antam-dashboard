@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🪙 Antam Gold Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="hero">
+      <div class="hero-left">
+        <h1>🪙 Antam <span class="gold">Emas</span></h1>
+        <p class="subtitle">Harga harian logam mulia Antam dalam Rupiah (Jual & Buyback)</p>
+      </div>
+      <div class="hero-right">
+        <div class="hero-stat">
+          <span class="hero-stat-label">Update</span>
+          <span class="hero-stat-value" id="last-update">—</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="kpi-grid" id="kpi-grid">
+      <div class="kpi-card sell">
+        <div class="kpi-label"><span class="dot sell"></span>Harga Jual 1g</div>
+        <div class="kpi-value" id="kpi-latest">—</div>
+        <div class="kpi-delta" id="kpi-delta">—</div>
+      </div>
+      <div class="kpi-card buyback">
+        <div class="kpi-label"><span class="dot buyback"></span>Harga Buyback 1g</div>
+        <div class="kpi-value" id="kpi-buyback">—</div>
+        <div class="kpi-delta muted" id="kpi-buyback-sub">—</div>
+      </div>
+      <div class="kpi-card spread">
+        <div class="kpi-label"><span class="dot spread"></span>Spread</div>
+        <div class="kpi-value" id="kpi-spread">—</div>
+        <div class="kpi-delta" id="kpi-spread-pct">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Perubahan (Rp)</div>
+        <div class="kpi-value" id="kpi-change">—</div>
+        <div class="kpi-delta" id="kpi-change-pct">—</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Tertinggi</div>
+        <div class="kpi-value" id="kpi-high">—</div>
+        <div class="kpi-delta muted">dalam periode</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Terendah</div>
+        <div class="kpi-value" id="kpi-low">—</div>
+        <div class="kpi-delta muted">dalam periode</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Rata-rata</div>
+        <div class="kpi-value" id="kpi-avg">—</div>
+        <div class="kpi-delta muted">periode ini</div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div class="control-group">
+        <label>Rentang Tanggal</label>
+        <div class="date-inputs">
+          <input type="date" id="start-date">
+          <span>→</span>
+          <input type="date" id="end-date">
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Ukuran Antam (gram)</label>
+        <div class="size-toggles" id="size-toggles"></div>
+      </div>
+      <div class="control-group">
+        <label>Tampilan</label>
+        <div class="display-toggles">
+          <label class="display-toggle">
+            <input type="checkbox" id="show-buyback" checked>
+            <span class="dot buyback"></span>Buyback
+          </label>
+          <label class="display-toggle">
+            <input type="checkbox" id="show-spread-fill" checked>
+            <span class="dot spread"></span>Area Spread
+          </label>
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Quick</label>
+        <div class="quick-buttons">
+          <button class="quick-btn" data-range="7">7H</button>
+          <button class="quick-btn" data-range="30">30H</button>
+          <button class="quick-btn" data-range="90">3B</button>
+          <button class="quick-btn" data-range="180">6B</button>
+          <button class="quick-btn" data-range="365">1T</button>
+          <button class="quick-btn" data-range="all">All</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="chart-section">
+      <div class="chart-header">
+        <h2>Tren Harga</h2>
+        <div class="chart-info" id="chart-info">—</div>
+      </div>
+      <div class="chart-wrapper">
+        <canvas id="price-chart"></canvas>
+      </div>
+    </section>
+
+    <section class="monthly-section">
+      <div class="section-header">
+        <div>
+          <h2>Rata-rata Bulanan</h2>
+          <p class="section-subtitle" id="month-summary">—</p>
+        </div>
+        <div class="selector-group">
+          <label for="year-selector">Pilih Tahun</label>
+          <select id="year-selector"></select>
+        </div>
+      </div>
+      <div class="month-stats" id="month-stats"></div>
+      <div class="table-wrapper">
+        <table id="monthly-table">
+          <thead>
+            <tr>
+              <th>Bulan</th>
+              <th class="group-sell">Rata-rata Jual (1g)</th>
+              <th class="group-buyback">Rata-rata Buyback (1g)</th>
+              <th>Δ% Jual</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <p>🪙 Antam Dashboard · <span id="data-range">—</span> · <a href="#" id="show-spread-explain">Apa itu spread?</a></p>
+    </footer>
+  </div>
+
+  <div class="modal" id="spread-modal">
+    <div class="modal-content">
+      <h3>Apa itu Spread?</h3>
+      <p><strong>Spread</strong> adalah selisih antara harga jual Antam dan harga buyback (harga ketika Antam membeli balik emas Anda).</p>
+      <p>Spread berubah-ubah setiap hari tergantung kondisi pasar. Semakin besar spread, semakin mahal "biaya" beli-jual emas Anda.</p>
+      <p>Spread tipikal Antam: <strong>6% - 12%</strong> dari harga buyback.</p>
+      <button id="close-modal">Tutup</button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
