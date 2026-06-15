@@ -840,3 +840,20 @@ footer {
     align-items: flex-start;
   }
 }
+
+/* ----- Monthly trend chart ----- */
+.monthly-trend-wrapper {
+  position: relative;
+  height: 260px;
+  margin: 12px 0 16px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 720px) {
+  .monthly-trend-wrapper {
+    height: 220px;
+  }
+}

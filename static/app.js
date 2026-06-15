@@ -3,6 +3,7 @@ const SIZES = [0.5, 1, 2, 3, 5, 10, 25, 50, 100, 250, 500, 1000];
 const DEFAULT_SIZES = [1];
 
 let chart = null;
+let monthlyChart = null;
 let fullData = null;
 let allRecords = null;
 let showBuyback = true;
@@ -647,6 +648,119 @@ function renderMonthly(records) {
       <td>${changeCell}</td>
     `;
     tbody.appendChild(tr);
+  });
+
+  // Render monthly trend chart (line chart of monthly averages)
+  renderMonthlyTrend(monthlyAverages, currentYear);
+}
+
+function renderMonthlyTrend(monthlyAverages, year) {
+  const canvas = document.getElementById('monthly-trend-chart');
+  if (!canvas) return;
+
+  // Build 12-month arrays (Jan=01..Dec=12), null for missing months
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const sellData = new Array(12).fill(null);
+  const buybackData = new Array(12).fill(null);
+  monthlyAverages.forEach((m) => {
+    const idx = parseInt(m.month, 10) - 1;
+    if (idx >= 0 && idx < 12) {
+      sellData[idx] = m.avgSell;
+      buybackData[idx] = m.avgBuyback;
+    }
+  });
+
+  const labels = monthNames.map((n, i) => `${n} ${year}`);
+  const datasets = [
+    {
+      label: `Rata-rata Jual 1g`,
+      data: sellData,
+      borderColor: '#d4af37',
+      backgroundColor: 'rgba(212, 175, 55, 0.12)',
+      borderWidth: 2.5,
+      pointBackgroundColor: '#f4d03f',
+      pointBorderColor: '#d4af37',
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.35,
+      fill: true,
+      spanGaps: false,
+    },
+    {
+      label: `Rata-rata Buyback 1g`,
+      data: buybackData,
+      borderColor: '#94a3b8',
+      backgroundColor: 'rgba(148, 163, 184, 0.08)',
+      borderWidth: 2,
+      pointBackgroundColor: '#cbd5e1',
+      pointBorderColor: '#94a3b8',
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      tension: 0.35,
+      fill: false,
+      spanGaps: false,
+      borderDash: [4, 3],
+    },
+  ];
+
+  if (monthlyChart) {
+    monthlyChart.data.labels = labels;
+    monthlyChart.data.datasets = datasets;
+    monthlyChart.update();
+    return;
+  }
+
+  monthlyChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: '#e8eaed',
+            usePointStyle: true,
+            pointStyle: 'circle',
+            padding: 12,
+            font: { size: 11 },
+            boxWidth: 8,
+          },
+        },
+        tooltip: {
+          backgroundColor: '#1a1f2e',
+          borderColor: '#d4af37',
+          borderWidth: 1,
+          titleColor: '#d4af37',
+          bodyColor: '#e8eaed',
+          padding: 10,
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y;
+              return v == null ? `${ctx.dataset.label}: —` : `${ctx.dataset.label}: ${idr(v)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#9aa0a6', font: { size: 11 } },
+        },
+        y: {
+          beginAtZero: false,
+          grid: { color: 'rgba(255,255,255,0.06)' },
+          ticks: {
+            color: '#9aa0a6',
+            font: { size: 11 },
+            callback: (v) => idrCompact(v),
+          },
+        },
+      },
+    },
   });
 }
 
