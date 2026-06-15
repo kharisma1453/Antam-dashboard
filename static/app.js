@@ -98,6 +98,9 @@ function attachListeners() {
 
   // Calculator listeners
   attachCalculatorListeners();
+
+  // Export Excel button
+  document.getElementById('export-excel').addEventListener('click', exportToExcel);
 }
 
 function applyQuickRange(range) {
@@ -885,4 +888,87 @@ function attachCalculatorListeners() {
 
   // Initial render
   recalcCalculator();
+}
+
+// ====== Excel Export ======
+function exportToExcel() {
+  // Sanity checks
+  if (!allRecords || allRecords.length === 0) {
+    alert('Belum ada data untuk di-export. Tunggu data selesai dimuat.');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    alert('Library Excel belum dimuat. Refresh halaman dan coba lagi.');
+    return;
+  }
+
+  // Use current filter (date range + sizes from chart)
+  const { start, end } = getDateRange();
+  const records = getFilteredRecords(start || null, end || null);
+  const sizes = getActiveSizes().sort((a, b) => a - b);
+
+  if (records.length === 0) {
+    alert('Tidak ada data dalam rentang tanggal ini.');
+    return;
+  }
+  if (sizes.length === 0) {
+    alert('Pilih minimal satu ukuran Antam (1g/5g/dst) di filter chart.');
+    return;
+  }
+
+  // Build header row
+  const headers = ['Date'];
+  sizes.forEach((s) => {
+    const sizeLabel = `${formatSize(s)}g`;
+    headers.push(`Antam ${sizeLabel} Jual (IDR)`);
+    headers.push(`Antam ${sizeLabel} Buyback (IDR)`);
+  });
+
+  // Build data rows
+  const rows = records.map((r) => {
+    const row = [r.date];
+    sizes.forEach((s) => {
+      const sk = sellKey(s);
+      const bk = buybackKey(s);
+      row.push(r[sk] != null ? r[sk] : '');
+      row.push(r[bk] != null ? r[bk] : '');
+    });
+    return row;
+  });
+
+  // Create worksheet + workbook
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  // Set column widths
+  ws['!cols'] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+
+  // Format IDR columns as number (Excel will display as integer)
+  const idrFmt = '#,##0';
+  for (let c = 1; c < headers.length; c++) {
+    for (let r = 1; r <= rows.length; r++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (ws[addr] && typeof ws[addr].v === 'number') {
+        ws[addr].z = idrFmt;
+      }
+    }
+  }
+
+  // Freeze header row
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
+  const wb = XLSX.utils.book_new();
+  const sheetName = (start && end) ? `${start}_to_${end}`.slice(0, 31) : 'Antam Data';
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  // Build filename
+  const today = new Date().toISOString().slice(0, 10);
+  let filename;
+  if (start && end) {
+    filename = `antam-${start}-to-${end}.xlsx`;
+  } else {
+    filename = `antam-data-all-${today}.xlsx`;
+  }
+
+  // Trigger download
+  XLSX.writeFile(wb, filename);
 }

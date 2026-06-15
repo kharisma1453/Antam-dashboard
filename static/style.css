@@ -857,3 +857,59 @@ footer {
     height: 220px;
   }
 }
+
+/* ----- Chart header actions + export button ----- */
+.chart-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.export-btn:hover {
+  border-color: var(--gold);
+  background: rgba(212, 175, 55, 0.08);
+  color: var(--gold-light);
+}
+
+.export-btn:active {
+  transform: scale(0.97);
+}
+
+.export-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.export-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+@media (max-width: 720px) {
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .chart-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

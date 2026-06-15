@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -104,7 +105,12 @@
     <section class="chart-section">
       <div class="chart-header">
         <h2>Tren Harga</h2>
-        <div class="chart-info" id="chart-info">—</div>
+        <div class="chart-header-actions">
+          <div class="chart-info" id="chart-info">—</div>
+          <button class="export-btn" id="export-excel" title="Download data yang sedang tampil di chart sebagai file Excel">
+            <span class="export-icon">📥</span> Export Excel
+          </button>
+        </div>
       </div>
       <div class="chart-wrapper">
         <canvas id="price-chart"></canvas>
