@@ -99,8 +99,9 @@ function attachListeners() {
   // Calculator listeners
   attachCalculatorListeners();
 
-  // Export Excel button
+  // Export Excel buttons
   document.getElementById('export-excel').addEventListener('click', exportToExcel);
+  document.getElementById('export-monthly').addEventListener('click', exportMonthlyToExcel);
 }
 
 function applyQuickRange(range) {
@@ -970,5 +971,127 @@ function exportToExcel() {
   }
 
   // Trigger download
+  XLSX.writeFile(wb, filename);
+}
+
+// ====== Excel Export (Monthly Summary) ======
+function exportMonthlyToExcel() {
+  if (typeof XLSX === 'undefined') {
+    alert('Library Excel belum dimuat. Refresh halaman dan coba lagi.');
+    return;
+  }
+  if (!currentYear || !allRecords || allRecords.length === 0) {
+    alert('Belum ada data bulanan untuk di-export. Pilih tahun di dropdown.');
+    return;
+  }
+
+  // Re-compute monthly averages for current year
+  const yearRecords = allRecords.filter((r) => r.date.startsWith(currentYear));
+  if (yearRecords.length === 0) {
+    alert(`Tidak ada data untuk tahun ${currentYear}.`);
+    return;
+  }
+
+  const byMonth = {};
+  yearRecords.forEach((r) => {
+    const m = r.date.slice(5, 7); // '01'..'12'
+    if (!byMonth[m]) byMonth[m] = [];
+    byMonth[m].push(r);
+  });
+
+  const sortedMonths = Object.keys(byMonth).sort();
+  const monthNameId = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+  // Build summary sheet rows
+  const summaryHeaders = ['Bulan', 'Tahun', 'Hari Trading', 'Rata-rata Jual 1g (IDR)', 'Rata-rata Buyback 1g (IDR)', 'Spread Rata-rata (IDR)', 'Δ% Jual'];
+  const summaryRows = sortedMonths.map((m, idx) => {
+    const recs = byMonth[m];
+    const sells = recs.map((r) => r.antam_1g).filter((v) => v != null);
+    const buybacks = recs.map((r) => r.antam_1g_buyback).filter((v) => v != null);
+    const avgSell = sells.length ? Math.round(sells.reduce((a, b) => a + b, 0) / sells.length) : null;
+    const avgBuyback = buybacks.length ? Math.round(buybacks.reduce((a, b) => a + b, 0) / buybacks.length) : null;
+    const spread = (avgSell != null && avgBuyback != null) ? avgSell - avgBuyback : null;
+
+    let changePct = null;
+    if (idx > 0) {
+      const prevRecs = byMonth[sortedMonths[idx - 1]];
+      const prevSells = prevRecs.map((r) => r.antam_1g).filter((v) => v != null);
+      const prevAvg = prevSells.length ? Math.round(prevSells.reduce((a, b) => a + b, 0) / prevSells.length) : null;
+      if (prevAvg && avgSell) changePct = ((avgSell - prevAvg) / prevAvg) * 100;
+    }
+
+    return [
+      monthNameId[parseInt(m, 10)],
+      currentYear,
+      recs.length,
+      avgSell != null ? avgSell : '',
+      avgBuyback != null ? avgBuyback : '',
+      spread != null ? spread : '',
+      changePct != null ? parseFloat(changePct.toFixed(2)) : '',
+    ];
+  });
+
+  // Build year-level stats sheet
+  const allSells = yearRecords.map((r) => r.antam_1g).filter((v) => v != null);
+  const allBuybacks = yearRecords.map((r) => r.antam_1g_buyback).filter((v) => v != null);
+  const yearHigh = allSells.length ? Math.max(...allSells) : null;
+  const yearLow = allSells.length ? Math.min(...allSells) : null;
+  const yearAvg = allSells.length ? Math.round(allSells.reduce((a, b) => a + b, 0) / allSells.length) : null;
+  const yearAvgBuyback = allBuybacks.length ? Math.round(allBuybacks.reduce((a, b) => a + b, 0) / allBuybacks.length) : null;
+  const yearOpen = yearRecords[0].antam_1g;
+  const yearClose = yearRecords[yearRecords.length - 1].antam_1g;
+  const yearChange = yearClose - yearOpen;
+  const yearChangePct = (yearChange / yearOpen) * 100;
+  const yearSpread = (yearAvg != null && yearAvgBuyback != null) ? yearAvg - yearAvgBuyback : null;
+
+  const statsRows = [
+    ['Statistik', 'Nilai'],
+    ['Tahun', currentYear],
+    ['Hari Trading', yearRecords.length],
+    ['Awal Tahun (IDR)', yearOpen],
+    ['Akhir Tahun (IDR)', yearClose],
+    ['Perubahan (IDR)', yearChange],
+    ['Perubahan (%)', parseFloat(yearChangePct.toFixed(2))],
+    ['Tertinggi (IDR)', yearHigh != null ? yearHigh : ''],
+    ['Terendah (IDR)', yearLow != null ? yearLow : ''],
+    ['Rata-rata Jual 1g (IDR)', yearAvg != null ? yearAvg : ''],
+    ['Rata-rata Buyback 1g (IDR)', yearAvgBuyback != null ? yearAvgBuyback : ''],
+    ['Spread Rata-rata (IDR)', yearSpread != null ? yearSpread : ''],
+  ];
+
+  // Build workbook
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Summary bulanan
+  const ws1 = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryRows]);
+  ws1['!cols'] = summaryHeaders.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+  // Format IDR columns
+  for (let r = 1; r <= summaryRows.length; r++) {
+    [3, 4, 5].forEach((c) => {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (ws1[addr] && typeof ws1[addr].v === 'number') ws1[addr].z = '#,##0';
+    });
+    // Δ% column
+    const addrPct = XLSX.utils.encode_cell({ r, c: 6 });
+    if (ws1[addrPct] && typeof ws1[addrPct].v === 'number') ws1[addrPct].z = '0.00"%"';
+  }
+  ws1['!freeze'] = { xSplit: 0, ySplit: 1 };
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary Bulanan');
+
+  // Sheet 2: Ringkasan tahunan
+  const ws2 = XLSX.utils.aoa_to_sheet(statsRows);
+  ws2['!cols'] = [{ wch: 28 }, { wch: 18 }];
+  // Format IDR/number cells
+  for (let r = 1; r < statsRows.length; r++) {
+    const addr = XLSX.utils.encode_cell({ r, c: 1 });
+    if (ws2[addr] && typeof ws2[addr].v === 'number') {
+      ws2[addr].z = statsRows[r][0].includes('(%)') ? '0.00"%"' : '#,##0';
+    }
+  }
+  ws2['!freeze'] = { xSplit: 0, ySplit: 1 };
+  XLSX.utils.book_append_sheet(wb, ws2, 'Ringkasan Tahunan');
+
+  // Filename
+  const filename = `antam-monthly-${currentYear}.xlsx`;
   XLSX.writeFile(wb, filename);
 }

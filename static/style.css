@@ -916,3 +916,22 @@ footer {
     justify-content: space-between;
   }
 }
+
+/* ----- Monthly section actions ----- */
+.monthly-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.monthly-actions .selector-group {
+  min-width: 160px;
+}
+
+@media (max-width: 720px) {
+  .monthly-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
