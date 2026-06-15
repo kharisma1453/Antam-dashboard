@@ -1630,6 +1630,10 @@ const SnakeGame = {
   render() {
     const ctx = this.ctx;
     const cs = this.cellSize;
+    // Scale factor — all hardcoded visual details were tuned for 20px cells,
+    // multiply by scale to keep proportions at any canvas size
+    const scale = cs / 20;
+    const px = (v) => v * scale;
 
     // Background
     ctx.fillStyle = '#0a0e1a';
@@ -1637,7 +1641,7 @@ const SnakeGame = {
 
     // Subtle grid
     ctx.strokeStyle = 'rgba(212, 175, 55, 0.05)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = Math.max(1, scale);
     for (let i = 0; i <= this.gridSize; i++) {
       ctx.beginPath();
       ctx.moveTo(i * cs + 0.5, 0);
@@ -1658,11 +1662,13 @@ const SnakeGame = {
       const h = cs * sizeRatio;
       const ox = (cs - w) / 2;
       const oy = (cs - h) / 2;
+      const goldR = px(3);
+      const goldPad = px(2);
 
       // Subtle glow for high tier
       if (this.food.value === 10) {
         ctx.shadowColor = '#fbbf24';
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = px(8);
       }
 
       // Gold gradient
@@ -1670,28 +1676,28 @@ const SnakeGame = {
       grad.addColorStop(0, this.food.color1);
       grad.addColorStop(1, this.food.color2);
       ctx.fillStyle = grad;
-      this.roundRect(ctx, fx + ox, fy + oy, w, h, 3);
+      this.roundRect(ctx, fx + ox, fy + oy, w, h, goldR);
       ctx.fill();
 
       // Border
       ctx.shadowBlur = 0;
       ctx.strokeStyle = 'rgba(122, 98, 18, 0.6)';
-      ctx.lineWidth = 1;
-      this.roundRect(ctx, fx + ox + 0.5, fy + oy + 0.5, w - 1, h - 1, 3);
+      ctx.lineWidth = Math.max(1, scale);
+      this.roundRect(ctx, fx + ox + 0.5, fy + oy + 0.5, w - 1, h - 1, goldR);
       ctx.stroke();
 
       // Top shine
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      this.roundRect(ctx, fx + ox + 2, fy + oy + 1.5, w - 4, Math.max(2, h * 0.18), 1.5);
+      this.roundRect(ctx, fx + ox + goldPad, fy + oy + px(1.5), w - goldPad * 2, Math.max(px(2), h * 0.18), px(1.5));
       ctx.fill();
 
       // Text label
       const text = this.food.value + 'g';
       ctx.fillStyle = '#0a0e1a';
-      ctx.font = `700 ${this.food.fontSize}px -apple-system, system-ui, "Segoe UI", sans-serif`;
+      ctx.font = `700 ${px(this.food.fontSize)}px -apple-system, system-ui, "Segoe UI", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, fx + cs / 2, fy + cs / 2 + 0.5);
+      ctx.fillText(text, fx + cs / 2, fy + cs / 2 + px(0.5));
     }
 
     // Snake
@@ -1700,7 +1706,7 @@ const SnakeGame = {
       const x = seg.x * cs;
       const y = seg.y * cs;
       const isHead = i === 0;
-      const pad = 1;
+      const pad = px(1);
 
       const grad = ctx.createLinearGradient(x, y, x, y + cs);
       if (isHead) {
@@ -1714,24 +1720,25 @@ const SnakeGame = {
         grad.addColorStop(1, `rgb(4, ${Math.floor(g * 0.5)}, ${Math.floor(70 * (1 - t * 0.4))})`);
       }
       ctx.fillStyle = grad;
-      this.roundRect(ctx, x + pad, y + pad, cs - pad * 2, cs - pad * 2, isHead ? 4 : 3);
+      this.roundRect(ctx, x + pad, y + pad, cs - pad * 2, cs - pad * 2, isHead ? px(4) : px(3));
       ctx.fill();
 
       // Subtle border
       ctx.strokeStyle = isHead ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
-      ctx.lineWidth = 1;
-      this.roundRect(ctx, x + pad + 0.5, y + pad + 0.5, cs - pad * 2 - 1, cs - pad * 2 - 1, isHead ? 4 : 3);
+      ctx.lineWidth = Math.max(1, scale);
+      this.roundRect(ctx, x + pad + 0.5, y + pad + 0.5, cs - pad * 2 - 1, cs - pad * 2 - 1, isHead ? px(4) : px(3));
       ctx.stroke();
 
       // Head: draw eyes
       if (isHead) {
         ctx.fillStyle = '#0a0e1a';
-        const eyeR = 1.8;
+        const eyeR = px(1.8);
+        const eyeOff = px(5);
         let ex1, ey1, ex2, ey2;
-        if (this.direction.x === 1)       { ex1 = x + cs - 5; ey1 = y + 5;      ex2 = x + cs - 5; ey2 = y + cs - 5;  }
-        else if (this.direction.x === -1) { ex1 = x + 5;     ey1 = y + 5;      ex2 = x + 5;     ey2 = y + cs - 5;  }
-        else if (this.direction.y === 1)  { ex1 = x + 5;     ey1 = y + cs - 5; ex2 = x + cs - 5; ey2 = y + cs - 5; }
-        else                              { ex1 = x + 5;     ey1 = y + 5;      ex2 = x + cs - 5; ey2 = y + 5;       }
+        if (this.direction.x === 1)       { ex1 = x + cs - eyeOff; ey1 = y + eyeOff;         ex2 = x + cs - eyeOff; ey2 = y + cs - eyeOff;   }
+        else if (this.direction.x === -1) { ex1 = x + eyeOff;      ey1 = y + eyeOff;         ex2 = x + eyeOff;      ey2 = y + cs - eyeOff;   }
+        else if (this.direction.y === 1)  { ex1 = x + eyeOff;      ey1 = y + cs - eyeOff;    ex2 = x + cs - eyeOff; ey2 = y + cs - eyeOff;   }
+        else                              { ex1 = x + eyeOff;      ey1 = y + eyeOff;         ex2 = x + cs - eyeOff; ey2 = y + eyeOff;        }
         ctx.beginPath();
         ctx.arc(ex1, ey1, eyeR, 0, Math.PI * 2);
         ctx.arc(ex2, ey2, eyeR, 0, Math.PI * 2);
