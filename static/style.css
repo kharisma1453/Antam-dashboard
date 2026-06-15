@@ -1176,3 +1176,45 @@ input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
+
+/* ROI: samakan wrapper Berat (gram) dengan form Ukuran Referensi */
+.roi-section .calc-input-wrap {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.roi-section .calc-input-wrap:hover {
+  border-color: var(--gold);
+  background: var(--bg-card);
+}
+
+.roi-section .calc-input-wrap:focus-within {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+.roi-section .calc-input-wrap input[type="number"] {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 7px 8px 7px 12px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.roi-section .calc-input-wrap .calc-input-suffix {
+  padding-right: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
