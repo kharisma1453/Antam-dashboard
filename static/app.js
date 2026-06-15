@@ -99,6 +99,11 @@ function attachListeners() {
   // Calculator listeners
   attachCalculatorListeners();
 
+  // ROI calculator listeners
+  attachROICalculatorListeners();
+  // Initial ROI compute (after data load)
+  computeROI();
+
   // Export Excel buttons
   document.getElementById('export-excel').addEventListener('click', exportToExcel);
   document.getElementById('export-monthly').addEventListener('click', exportMonthlyToExcel);
@@ -1094,4 +1099,186 @@ function exportMonthlyToExcel() {
   // Filename
   const filename = `antam-monthly-${currentYear}.xlsx`;
   XLSX.writeFile(wb, filename);
+}
+
+// ====== ROI Calculator ======
+let roiMode = 'buyback'; // 'sell' | 'buyback'
+
+function buildSizeKey(sizeStr, mode) {
+  // 0.5 -> 0_5, 1 -> 1, 1000 -> 1000
+  const s = String(sizeStr).replace('.', '_');
+  return `antam_${s}g${mode === 'buyback' ? '_buyback' : ''}`;
+}
+
+function lookupPrice(sizeKey, dateStr) {
+  if (!rawDates || !rawColumns || !rawColumns[sizeKey]) return null;
+  // binary search (rawDates is sorted ascending)
+  let lo = 0, hi = rawDates.length - 1, idx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (rawDates[mid] === dateStr) { idx = mid; break; }
+    if (rawDates[mid] < dateStr) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  if (idx === -1) return null;
+  return rawColumns[sizeKey][idx];
+}
+
+function findClosestDateIndex(dateStr) {
+  // If exact date not found, return the latest index <= dateStr
+  if (!rawDates || rawDates.length === 0) return -1;
+  if (dateStr >= rawDates[rawDates.length - 1]) return rawDates.length - 1;
+  if (dateStr < rawDates[0]) return -1;
+  let lo = 0, hi = rawDates.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (rawDates[mid] <= dateStr) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
+function formatHoldingPeriod(days) {
+  if (days < 0) return '—';
+  const years = Math.floor(days / 365);
+  const remainingAfterYears = days - years * 365;
+  const months = Math.floor(remainingAfterYears / 30.4375);
+  const d = Math.round(remainingAfterYears - months * 30.4375);
+  const parts = [];
+  if (years > 0) parts.push(`${years} tahun`);
+  if (months > 0) parts.push(`${months} bulan`);
+  parts.push(`${d} hari`);
+  return parts.join(' ');
+}
+
+function formatDateID(dateStr) {
+  // 2020-03-15 -> "15 Mar 2020"
+  const [y, m, d] = dateStr.split('-');
+  const monthName = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][parseInt(m, 10)];
+  return `${parseInt(d, 10)} ${monthName} ${y}`;
+}
+
+function computeROI() {
+  if (!rawDates || rawDates.length === 0) return;
+
+  const dateInput = document.getElementById('roi-buy-date');
+  const sizeInput = document.getElementById('roi-size-ref');
+  const gramsInput = document.getElementById('roi-grams');
+  const labelEl = document.getElementById('roi-mode-label');
+
+  // Set min/max for date input on first run
+  if (!dateInput.min) {
+    dateInput.min = rawDates[0];
+    dateInput.max = rawDates[rawDates.length - 1];
+    // Default to a year ago for nice demo
+    const last = new Date(rawDates[rawDates.length - 1]);
+    last.setFullYear(last.getFullYear() - 1);
+    const def = last.toISOString().slice(0, 10);
+    dateInput.value = def >= rawDates[0] ? def : rawDates[0];
+  }
+
+  labelEl.textContent = roiMode === 'buyback'
+    ? 'Nilai sekarang = harga Buyback Antam × gram (realistis kalau Anda jual balik ke Antam)'
+    : 'Nilai sekarang = harga Jual Antam × gram (harga retail kalau Anda beli hari ini)';
+
+  const buyDate = dateInput.value;
+  const sizeRef = sizeInput.value;
+  const grams = parseFloat(gramsInput.value);
+
+  if (!buyDate || !sizeRef || !grams || grams <= 0) {
+    ['roi-modal', 'roi-current', 'roi-pnl', 'roi-cagr'].forEach((id) => {
+      document.getElementById(id).textContent = '—';
+      document.getElementById(id).className = 'roi-result-value neutral';
+    });
+    ['roi-modal-detail', 'roi-current-detail', 'roi-pnl-detail', 'roi-cagr-detail'].forEach((id) => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('roi-period').textContent = '—';
+    return;
+  }
+
+  const sizeKeyBuy = buildSizeKey(sizeRef, 'sell'); // modal = historical sell price
+  const sizeKeyNow = buildSizeKey(sizeRef, roiMode);
+
+  const buyIdx = findClosestDateIndex(buyDate);
+  if (buyIdx < 0) {
+    document.getElementById('roi-modal').textContent = '—';
+    document.getElementById('roi-modal-detail').textContent = `Tidak ada data untuk tanggal ${formatDateID(buyDate)}`;
+    return;
+  }
+  const actualBuyDate = rawDates[buyIdx];
+  const lastIdx = rawDates.length - 1;
+  const lastDate = rawDates[lastIdx];
+
+  const buyPrice = rawColumns[sizeKeyBuy][buyIdx];
+  const currentPrice = rawColumns[sizeKeyNow][lastIdx];
+
+  if (buyPrice == null || currentPrice == null) {
+    document.getElementById('roi-modal').textContent = 'Data tidak tersedia';
+    return;
+  }
+
+  const modal = buyPrice * grams;
+  const current = currentPrice * grams;
+  const pnl = current - modal;
+  const pnlPct = (pnl / modal) * 100;
+
+  const d1 = new Date(actualBuyDate);
+  const d2 = new Date(lastDate);
+  const days = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)));
+  const years = days / 365.25;
+  // CAGR = (current/modal)^(1/years) - 1
+  let cagr = null;
+  if (years > 0 && modal > 0) {
+    cagr = (Math.pow(current / modal, 1 / years) - 1) * 100;
+  }
+
+  // Modal
+  document.getElementById('roi-modal').textContent = idr(modal);
+  document.getElementById('roi-modal').className = 'roi-result-value';
+  document.getElementById('roi-modal-detail').textContent = `${grams}g × ${idr(buyPrice)} (${sizeRef}g @ ${formatDateID(actualBuyDate)})`;
+
+  // Current
+  document.getElementById('roi-current').textContent = idr(current);
+  document.getElementById('roi-current').className = 'roi-result-value';
+  document.getElementById('roi-current-detail').textContent = `${grams}g × ${idr(currentPrice)} (${sizeRef}g @ ${formatDateID(lastDate)} · ${roiMode === 'buyback' ? 'buyback' : 'jual'})`;
+
+  // PnL
+  const pnlEl = document.getElementById('roi-pnl');
+  const pnlPctStr = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%';
+  const pnlSign = pnl >= 0 ? '+' : '−';
+  pnlEl.textContent = `${pnlSign}${idr(Math.abs(pnl))} (${pnlPctStr})`;
+  pnlEl.className = 'roi-result-value ' + (pnl >= 0 ? 'positive' : 'negative');
+  document.getElementById('roi-pnl-detail').textContent = pnl >= 0 ? '📈 Untung' : '📉 Rugi';
+
+  // CAGR
+  const cagrEl = document.getElementById('roi-cagr');
+  if (cagr != null && isFinite(cagr)) {
+    const cagrStr = (cagr >= 0 ? '+' : '') + cagr.toFixed(2) + '%/thn';
+    cagrEl.textContent = cagrStr;
+    cagrEl.className = 'roi-result-value ' + (cagr >= 0 ? 'positive' : 'negative');
+  } else {
+    cagrEl.textContent = '—';
+    cagrEl.className = 'roi-result-value neutral';
+  }
+  document.getElementById('roi-cagr-detail').textContent = years >= 1 ? `Rata-rata return pertahun` : `Holding < 1 tahun, CAGR kurang akurat`;
+
+  // Period
+  document.getElementById('roi-period').textContent =
+    `⏱️ Holding period: ${formatHoldingPeriod(days)} · dari ${formatDateID(actualBuyDate)} sampai ${formatDateID(lastDate)}`;
+}
+
+function attachROICalculatorListeners() {
+  document.getElementById('roi-buy-date').addEventListener('change', computeROI);
+  document.getElementById('roi-size-ref').addEventListener('change', computeROI);
+  document.getElementById('roi-grams').addEventListener('input', computeROI);
+
+  document.querySelectorAll('#roi-mode-toggle .roi-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#roi-mode-toggle .roi-mode-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      roiMode = btn.dataset.mode;
+      computeROI();
+    });
+  });
 }

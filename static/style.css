@@ -982,3 +982,186 @@ footer {
   margin-right: 6px;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
 }
+
+/* ----- ROI Calculator ----- */
+.roi-icon {
+  display: inline-block;
+  vertical-align: -3px;
+  margin-right: 6px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+}
+
+.roi-mode-toggle {
+  display: inline-flex;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.roi-mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.roi-mode-btn:hover {
+  color: var(--text);
+}
+
+.roi-mode-btn.active {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+  box-shadow: inset 0 0 0 1px #10b981;
+}
+
+.roi-form-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.roi-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.roi-input-group label {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.roi-input-group input[type="date"],
+.roi-input-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--bg-elevated);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23d4af37' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 9px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 28px 7px 12px;
+  width: 100%;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.roi-input-group input[type="date"] {
+  background-image: none;
+  padding-right: 12px;
+  color-scheme: dark;
+}
+
+.roi-input-group input[type="date"]:hover,
+.roi-input-group select:hover {
+  border-color: var(--gold);
+  background-color: var(--bg-card);
+}
+
+.roi-input-group input[type="date"]:focus,
+.roi-input-group select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+.roi-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.roi-result-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.2s ease;
+}
+
+.roi-result-card.roi-result-highlight {
+  border-color: rgba(212, 175, 55, 0.35);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.06) 0%, var(--bg-card) 100%);
+}
+
+.roi-result-label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.roi-result-value {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.roi-result-value.positive {
+  color: #10b981;
+}
+
+.roi-result-value.negative {
+  color: #ef4444;
+}
+
+.roi-result-value.neutral {
+  color: var(--text-dim);
+}
+
+.roi-result-detail {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.roi-period {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .roi-form-row {
+    grid-template-columns: 1fr;
+  }
+  .roi-result-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .roi-mode-toggle {
+    margin-top: 8px;
+  }
+}

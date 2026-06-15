@@ -220,6 +220,86 @@
       </div>
     </section>
 
+    <section class="roi-section">
+      <div class="section-header">
+        <div>
+          <h2><svg class="roi-icon" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="roiGold" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#f4d03f"/>
+                <stop offset="100%" stop-color="#b8941f"/>
+              </linearGradient>
+            </defs>
+            <path d="M3 17 L9 11 L13 15 L21 7" fill="none" stroke="url(#roiGold)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M15 7 L21 7 L21 13" fill="none" stroke="url(#roiGold)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="9" cy="11" r="1.4" fill="#d4af37"/>
+            <circle cx="13" cy="15" r="1.4" fill="#d4af37"/>
+          </svg> ROI Calculator</h2>
+          <p class="section-subtitle" id="roi-mode-label">Hitung profit/loss investasi emas Antam dari tanggal beli hingga hari ini</p>
+        </div>
+        <div class="roi-mode-toggle" id="roi-mode-toggle">
+          <button class="roi-mode-btn" data-mode="sell">Harga Jual</button>
+          <button class="roi-mode-btn active" data-mode="buyback">Harga Buyback</button>
+        </div>
+      </div>
+
+      <div class="roi-form-row">
+        <div class="roi-input-group">
+          <label for="roi-buy-date">Tanggal Pembelian</label>
+          <input type="date" id="roi-buy-date">
+        </div>
+        <div class="roi-input-group">
+          <label for="roi-size-ref">Ukuran Referensi</label>
+          <select id="roi-size-ref">
+            <option value="0.5">0.5g</option>
+            <option value="1" selected>1g</option>
+            <option value="2">2g</option>
+            <option value="3">3g</option>
+            <option value="5">5g</option>
+            <option value="10">10g</option>
+            <option value="25">25g</option>
+            <option value="50">50g</option>
+            <option value="100">100g</option>
+            <option value="250">250g</option>
+            <option value="500">500g</option>
+            <option value="1000">1000g</option>
+          </select>
+        </div>
+        <div class="roi-input-group">
+          <label for="roi-grams">Berat (gram)</label>
+          <div class="calc-input-wrap">
+            <input type="number" id="roi-grams" min="0.1" max="10000" step="0.1" value="1" inputmode="decimal">
+            <span class="calc-input-suffix">gram</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="roi-result-grid">
+        <div class="roi-result-card">
+          <div class="roi-result-label">Modal Awal</div>
+          <div class="roi-result-value" id="roi-modal">—</div>
+          <div class="roi-result-detail" id="roi-modal-detail">—</div>
+        </div>
+        <div class="roi-result-card">
+          <div class="roi-result-label">Nilai Sekarang</div>
+          <div class="roi-result-value" id="roi-current">—</div>
+          <div class="roi-result-detail" id="roi-current-detail">—</div>
+        </div>
+        <div class="roi-result-card roi-result-highlight">
+          <div class="roi-result-label">Profit / Loss</div>
+          <div class="roi-result-value" id="roi-pnl">—</div>
+          <div class="roi-result-detail" id="roi-pnl-detail">—</div>
+        </div>
+        <div class="roi-result-card">
+          <div class="roi-result-label">Annualized Return (CAGR)</div>
+          <div class="roi-result-value" id="roi-cagr">—</div>
+          <div class="roi-result-detail" id="roi-cagr-detail">—</div>
+        </div>
+      </div>
+
+      <div class="roi-period" id="roi-period">—</div>
+    </section>
+
     <footer>
       <p>🪙 Antam Dashboard · <span id="data-range">—</span> · <a href="#" id="show-spread-explain">Apa itu spread?</a></p>
     </footer>
