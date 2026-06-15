@@ -107,6 +107,9 @@ function attachListeners() {
   // Export Excel buttons
   document.getElementById('export-excel').addEventListener('click', exportToExcel);
   document.getElementById('export-monthly').addEventListener('click', exportMonthlyToExcel);
+
+  // Snake Xenzia game
+  initSnakeGame();
 }
 
 function applyQuickRange(range) {
@@ -1399,4 +1402,360 @@ function attachROICalculatorListeners() {
       computeROI();
     });
   });
+}
+
+// ====== Snake Xenzia Game ======
+const SnakeGame = {
+  canvas: null,
+  ctx: null,
+  gridSize: 20,
+  cellSize: 20,
+  snake: [],
+  direction: { x: 1, y: 0 },
+  nextDirection: { x: 1, y: 0 },
+  food: null,
+  score: 0,
+  goldCollected: 0,
+  highScore: 0,
+  speed: 150,
+  minSpeed: 70,
+  tickTimer: null,
+  paused: true,
+  gameOver: false,
+  isReady: false,
+  isVisible: true,
+
+  goldTypes: {
+    low:  { value: 1,  size: 0.65, color1: '#fde68a', color2: '#d4af37', fontSize: 9  },
+    mid:  { value: 5,  size: 0.78, color1: '#fcd34d', color2: '#b8941f', fontSize: 10 },
+    high: { value: 10, size: 0.92, color1: '#fbbf24', color2: '#7a6212', fontSize: 11 }
+  },
+
+  // Pick available gold tiers based on current score (progressive difficulty)
+  getAvailableGold() {
+    if (this.score < 5)  return [this.goldTypes.low];
+    if (this.score < 20) return [this.goldTypes.low, this.goldTypes.mid];
+    return [this.goldTypes.low, this.goldTypes.mid, this.goldTypes.high];
+  },
+
+  init() {
+    this.canvas = document.getElementById('game-canvas');
+    if (!this.canvas) return;
+    this.ctx = this.canvas.getContext('2d');
+    this.cellSize = this.canvas.width / this.gridSize;
+    this.highScore = parseInt(localStorage.getItem('snakeHighScore') || '0', 10);
+    document.getElementById('game-highscore').textContent = this.highScore;
+
+    document.getElementById('game-start-btn').addEventListener('click', () => {
+      if (this.gameOver) this.reset();
+      this.start();
+    });
+
+    document.addEventListener('keydown', (e) => this.handleKey(e));
+
+    document.querySelectorAll('.game-mobile-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const d = btn.dataset.dir;
+        if (d === 'up') this.tryChangeDir(0, -1);
+        else if (d === 'down') this.tryChangeDir(0, 1);
+        else if (d === 'left') this.tryChangeDir(-1, 0);
+        else if (d === 'right') this.tryChangeDir(1, 0);
+      });
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && !this.paused) this.pause();
+    });
+
+    this.reset();
+    this.render();
+    this.isReady = true;
+  },
+
+  reset() {
+    this.snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    this.direction = { x: 1, y: 0 };
+    this.nextDirection = { x: 1, y: 0 };
+    this.score = 0;
+    this.goldCollected = 0;
+    this.speed = 150;
+    this.paused = true;
+    this.gameOver = false;
+    this.spawnFood();
+    this.updateStats();
+  },
+
+  start() {
+    if (this.gameOver) this.reset();
+    this.paused = false;
+    this.hideOverlay();
+    this.clearTick();
+    this.tickTimer = setInterval(() => this.tick(), this.speed);
+  },
+
+  pause() {
+    this.paused = true;
+    this.clearTick();
+    this.showOverlay('⏸️  Paused', 'Tekan Spasi atau Mulai untuk lanjut', 'Lanjut');
+  },
+
+  endGame() {
+    this.gameOver = true;
+    this.paused = true;
+    this.clearTick();
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      localStorage.setItem('snakeHighScore', String(this.highScore));
+      document.getElementById('game-highscore').textContent = this.highScore;
+      this.showOverlay('🏆  High Score Baru!', `Skor: ${this.score}  ·  Emas: ${this.goldCollected}g  ·  Panjang: ${this.snake.length}`, 'Main Lagi');
+    } else {
+      this.showOverlay('💀  Game Over', `Skor: ${this.score}  ·  Emas: ${this.goldCollected}g  ·  High Score: ${this.highScore}`, 'Main Lagi');
+    }
+  },
+
+  clearTick() {
+    if (this.tickTimer) { clearInterval(this.tickTimer); this.tickTimer = null; }
+  },
+
+  tick() {
+    if (this.paused || this.gameOver) return;
+    this.direction = { ...this.nextDirection };
+
+    const head = this.snake[0];
+    const newHead = { x: head.x + this.direction.x, y: head.y + this.direction.y };
+
+    // Wall collision
+    if (newHead.x < 0 || newHead.x >= this.gridSize || newHead.y < 0 || newHead.y >= this.gridSize) {
+      this.endGame();
+      return;
+    }
+
+    // Self collision (check against body, excluding last segment which will move)
+    for (let i = 0; i < this.snake.length - 1; i++) {
+      if (this.snake[i].x === newHead.x && this.snake[i].y === newHead.y) {
+        this.endGame();
+        return;
+      }
+    }
+
+    this.snake.unshift(newHead);
+
+    // Food collision
+    if (this.food && newHead.x === this.food.x && newHead.y === this.food.y) {
+      this.score += this.food.value;
+      this.goldCollected += this.food.value;
+      // Speed up every 2 food items
+      if (this.score % 2 === 0 && this.speed > this.minSpeed) {
+        this.speed = Math.max(this.minSpeed, this.speed - 5);
+        this.clearTick();
+        this.tickTimer = setInterval(() => this.tick(), this.speed);
+      }
+      this.spawnFood();
+      this.updateStats();
+    } else {
+      this.snake.pop();
+    }
+
+    this.render();
+  },
+
+  spawnFood() {
+    const available = this.getAvailableGold();
+    // Equal chance within available tiers (progressive = "more available" not "more likely")
+    const tier = available[Math.floor(Math.random() * available.length)];
+
+    // Find empty cell
+    let pos, attempts = 0;
+    do {
+      pos = {
+        x: Math.floor(Math.random() * this.gridSize),
+        y: Math.floor(Math.random() * this.gridSize)
+      };
+      attempts++;
+      if (attempts > 200) break;
+    } while (this.snake.some(s => s.x === pos.x && s.y === pos.y));
+
+    this.food = { ...pos, ...tier };
+  },
+
+  tryChangeDir(x, y) {
+    // No 180° reversal
+    if (this.direction.x === -x && this.direction.y === -y) return;
+    if (this.direction.x === x && this.direction.y === y) return;
+    this.nextDirection = { x, y };
+    // First direction input auto-starts the game
+    if (this.paused && !this.gameOver) this.start();
+  },
+
+  handleKey(e) {
+    // Only react to game keys when the game section is in view
+    if (!this.isReady) return;
+    const key = e.key.toLowerCase();
+    if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' ', 'enter', 'r'].indexOf(key) === -1) return;
+
+    if (key === 'arrowup' || key === 'w')    { e.preventDefault(); this.tryChangeDir(0, -1); }
+    else if (key === 'arrowdown' || key === 's') { e.preventDefault(); this.tryChangeDir(0, 1); }
+    else if (key === 'arrowleft' || key === 'a') { e.preventDefault(); this.tryChangeDir(-1, 0); }
+    else if (key === 'arrowright' || key === 'd'){ e.preventDefault(); this.tryChangeDir(1, 0); }
+    else if (key === ' ' || key === 'enter') {
+      e.preventDefault();
+      if (this.gameOver) this.start();
+      else if (this.paused) this.start();
+      else this.pause();
+    }
+    else if (key === 'r') {
+      this.reset();
+      this.start();
+    }
+  },
+
+  updateStats() {
+    document.getElementById('game-score').textContent = this.score;
+    document.getElementById('game-gold').textContent = this.goldCollected + 'g';
+    document.getElementById('game-length').textContent = this.snake.length;
+  },
+
+  showOverlay(title, subtitle, btnText) {
+    const overlay = document.getElementById('game-overlay');
+    document.getElementById('game-overlay-title').textContent = title;
+    document.getElementById('game-overlay-subtitle').textContent = subtitle;
+    document.getElementById('game-start-btn').textContent = btnText;
+    overlay.classList.remove('hidden');
+  },
+
+  hideOverlay() {
+    document.getElementById('game-overlay').classList.add('hidden');
+  },
+
+  render() {
+    const ctx = this.ctx;
+    const cs = this.cellSize;
+
+    // Background
+    ctx.fillStyle = '#0a0e1a';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Subtle grid
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.05)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= this.gridSize; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * cs + 0.5, 0);
+      ctx.lineTo(i * cs + 0.5, this.canvas.height);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, i * cs + 0.5);
+      ctx.lineTo(this.canvas.width, i * cs + 0.5);
+      ctx.stroke();
+    }
+
+    // Food (gold bar)
+    if (this.food) {
+      const fx = this.food.x * cs;
+      const fy = this.food.y * cs;
+      const sizeRatio = this.food.size;
+      const w = cs * sizeRatio;
+      const h = cs * sizeRatio;
+      const ox = (cs - w) / 2;
+      const oy = (cs - h) / 2;
+
+      // Subtle glow for high tier
+      if (this.food.value === 10) {
+        ctx.shadowColor = '#fbbf24';
+        ctx.shadowBlur = 8;
+      }
+
+      // Gold gradient
+      const grad = ctx.createLinearGradient(fx + ox, fy + oy, fx + ox, fy + oy + h);
+      grad.addColorStop(0, this.food.color1);
+      grad.addColorStop(1, this.food.color2);
+      ctx.fillStyle = grad;
+      this.roundRect(ctx, fx + ox, fy + oy, w, h, 3);
+      ctx.fill();
+
+      // Border
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(122, 98, 18, 0.6)';
+      ctx.lineWidth = 1;
+      this.roundRect(ctx, fx + ox + 0.5, fy + oy + 0.5, w - 1, h - 1, 3);
+      ctx.stroke();
+
+      // Top shine
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      this.roundRect(ctx, fx + ox + 2, fy + oy + 1.5, w - 4, Math.max(2, h * 0.18), 1.5);
+      ctx.fill();
+
+      // Text label
+      const text = this.food.value + 'g';
+      ctx.fillStyle = '#0a0e1a';
+      ctx.font = `700 ${this.food.fontSize}px -apple-system, system-ui, "Segoe UI", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, fx + cs / 2, fy + cs / 2 + 0.5);
+    }
+
+    // Snake
+    for (let i = this.snake.length - 1; i >= 0; i--) {
+      const seg = this.snake[i];
+      const x = seg.x * cs;
+      const y = seg.y * cs;
+      const isHead = i === 0;
+      const pad = 1;
+
+      const grad = ctx.createLinearGradient(x, y, x, y + cs);
+      if (isHead) {
+        grad.addColorStop(0, '#6ee7b7');
+        grad.addColorStop(1, '#10b981');
+      } else {
+        // Slight color variation along body
+        const t = i / this.snake.length;
+        const g = Math.floor(180 - t * 60);
+        grad.addColorStop(0, `rgb(${52 + Math.floor(t * -20)}, ${g + 70}, ${110 - Math.floor(t * 30)})`);
+        grad.addColorStop(1, `rgb(4, ${Math.floor(g * 0.5)}, ${Math.floor(70 * (1 - t * 0.4))})`);
+      }
+      ctx.fillStyle = grad;
+      this.roundRect(ctx, x + pad, y + pad, cs - pad * 2, cs - pad * 2, isHead ? 4 : 3);
+      ctx.fill();
+
+      // Subtle border
+      ctx.strokeStyle = isHead ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)';
+      ctx.lineWidth = 1;
+      this.roundRect(ctx, x + pad + 0.5, y + pad + 0.5, cs - pad * 2 - 1, cs - pad * 2 - 1, isHead ? 4 : 3);
+      ctx.stroke();
+
+      // Head: draw eyes
+      if (isHead) {
+        ctx.fillStyle = '#0a0e1a';
+        const eyeR = 1.8;
+        let ex1, ey1, ex2, ey2;
+        if (this.direction.x === 1)       { ex1 = x + cs - 5; ey1 = y + 5;      ex2 = x + cs - 5; ey2 = y + cs - 5;  }
+        else if (this.direction.x === -1) { ex1 = x + 5;     ey1 = y + 5;      ex2 = x + 5;     ey2 = y + cs - 5;  }
+        else if (this.direction.y === 1)  { ex1 = x + 5;     ey1 = y + cs - 5; ex2 = x + cs - 5; ey2 = y + cs - 5; }
+        else                              { ex1 = x + 5;     ey1 = y + 5;      ex2 = x + cs - 5; ey2 = y + 5;       }
+        ctx.beginPath();
+        ctx.arc(ex1, ey1, eyeR, 0, Math.PI * 2);
+        ctx.arc(ex2, ey2, eyeR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  },
+
+  roundRect(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.lineTo(x + w - rr, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+    ctx.lineTo(x + w, y + h - rr);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+    ctx.lineTo(x + rr, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+    ctx.lineTo(x, y + rr);
+    ctx.quadraticCurveTo(x, y, x + rr, y);
+    ctx.closePath();
+  }
+};
+
+function initSnakeGame() {
+  SnakeGame.init();
 }

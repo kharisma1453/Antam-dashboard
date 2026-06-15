@@ -317,6 +317,60 @@
       <div class="roi-period" id="roi-period">—</div>
     </section>
 
+    <section class="game-section">
+      <div class="section-header">
+        <div>
+          <h2>🐍 Snake Xenzia Emas</h2>
+          <p class="section-subtitle">Ular ijo makan emas Antam. Makin tinggi skor, makin besar &amp; jarang emasnya!</p>
+        </div>
+        <div class="game-stats">
+          <div class="game-stat">
+            <span class="game-stat-label">Skor</span>
+            <span class="game-stat-value" id="game-score">0</span>
+          </div>
+          <div class="game-stat">
+            <span class="game-stat-label">Emas</span>
+            <span class="game-stat-value" id="game-gold">0g</span>
+          </div>
+          <div class="game-stat">
+            <span class="game-stat-label">Panjang</span>
+            <span class="game-stat-value" id="game-length">3</span>
+          </div>
+          <div class="game-stat">
+            <span class="game-stat-label">High Score</span>
+            <span class="game-stat-value" id="game-highscore">0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-wrapper">
+        <canvas id="game-canvas" width="400" height="400"></canvas>
+        <div class="game-overlay" id="game-overlay">
+          <div class="game-overlay-content">
+            <div class="game-overlay-icon" id="game-overlay-icon">🐍</div>
+            <div class="game-overlay-title" id="game-overlay-title">Snake Xenzia Emas</div>
+            <div class="game-overlay-subtitle" id="game-overlay-subtitle">Gunakan arrow keys atau WASD. Tekan R untuk restart.</div>
+            <button class="game-start-btn" id="game-start-btn">Mulai Main</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-legend">
+        <span><span class="game-legend-dot" style="background: linear-gradient(180deg, #fde68a, #d4af37)"></span>1g (umum, awal main)</span>
+        <span><span class="game-legend-dot" style="background: linear-gradient(180deg, #fcd34d, #b8941f)"></span>5g (jarang, skor ≥ 5)</span>
+        <span><span class="game-legend-dot" style="background: linear-gradient(180deg, #fbbf24, #7a6212)"></span>10g (langka, skor ≥ 20)</span>
+      </div>
+
+      <div class="game-controls-mobile">
+        <button class="game-mobile-btn" data-dir="up" aria-label="Atas">▲</button>
+        <div class="game-mobile-row">
+          <button class="game-mobile-btn" data-dir="left" aria-label="Kiri">◀</button>
+          <button class="game-mobile-btn" data-dir="down" aria-label="Bawah">▼</button>
+          <button class="game-mobile-btn" data-dir="right" aria-label="Kanan">▶</button>
+        </div>
+      </div>
+    </section>
+
     <footer>
       <p>🪙 Antam Dashboard · <span id="data-range">—</span> · <a href="#" id="show-spread-explain">Apa itu spread?</a></p>
     </footer>
