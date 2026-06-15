@@ -1118,6 +1118,75 @@ footer {
   transition: opacity 0.2s ease;
 }
 
+/* ----- ROI headline panel (mirror of .calc-result-panel) ----- */
+.roi-headline-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 24px;
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  margin: 16px 0;
+}
+
+.roi-headline-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold) 50%, transparent 100%);
+  opacity: 0.75;
+  transition: background 0.2s ease;
+}
+
+.roi-headline-panel.mode-buyback::before {
+  background: linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%);
+}
+
+.roi-headline-panel.mode-sell::before {
+  background: linear-gradient(90deg, transparent 0%, #f87171 50%, transparent 100%);
+}
+
+.roi-headline-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
+.roi-headline-value {
+  color: var(--gold-light);
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  word-break: break-all;
+  transition: color 0.2s ease;
+}
+
+.roi-headline-value.positive { color: #10b981; }
+.roi-headline-value.negative { color: #ef4444; }
+.roi-headline-value.neutral  { color: var(--text-dim); }
+
+.roi-headline-formula {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+
+@media (max-width: 720px) {
+  .roi-headline-value { font-size: 26px; }
+  .roi-headline-panel { padding: 18px 18px; }
+}
+
 /* Mode-colored treatment (matches Kalkulator Nilai Emas: ijo buyback, merah jual) */
 .roi-result-grid.mode-buyback .roi-result-card {
   border-color: rgba(16, 185, 129, 0.32);

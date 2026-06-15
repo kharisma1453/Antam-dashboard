@@ -1218,11 +1218,16 @@ function computeROI() {
     ? 'Nilai sekarang = harga Buyback Antam × gram (realistis kalau Anda jual balik ke Antam)'
     : 'Nilai sekarang = harga Jual Antam × gram (harga retail kalau Anda beli hari ini)';
 
-  // Color the result cards based on active mode (mirrors Kalkulator Nilai Emas)
+  // Color the result cards & headline panel based on active mode (mirrors Kalkulator Nilai Emas)
   const gridEl = document.getElementById('roi-result-grid');
   if (gridEl) {
     gridEl.classList.toggle('mode-buyback', roiMode === 'buyback');
     gridEl.classList.toggle('mode-sell', roiMode === 'sell');
+  }
+  const headlineEl = document.getElementById('roi-headline-panel');
+  if (headlineEl) {
+    headlineEl.classList.toggle('mode-buyback', roiMode === 'buyback');
+    headlineEl.classList.toggle('mode-sell', roiMode === 'sell');
   }
 
   // Initialize defaults on first row if not yet
@@ -1243,6 +1248,11 @@ function computeROI() {
       document.getElementById(id).textContent = '—';
     });
     document.getElementById('roi-period').textContent = '—';
+    // Reset headline panel too
+    const hv = document.getElementById('roi-headline-value');
+    if (hv) { hv.textContent = '—'; hv.className = 'roi-headline-value neutral'; }
+    const hf = document.getElementById('roi-headline-formula');
+    if (hf) { hf.textContent = 'Pilih tanggal & berat pembelian untuk melihat hasil'; }
   };
 
   if (validRows.length === 0) {
@@ -1323,6 +1333,17 @@ function computeROI() {
   pnlEl.textContent = `${pnlSign}${idr(Math.abs(totalPnl))} (${pnlPctStr})`;
   pnlEl.className = 'roi-result-value ' + (totalPnl >= 0 ? 'positive' : 'negative');
   document.getElementById('roi-pnl-detail').textContent = totalPnl >= 0 ? '📈 Untung' : '📉 Rugi';
+
+  // Headline panel (hero result)
+  const headlineVal = document.getElementById('roi-headline-value');
+  const headlineForm = document.getElementById('roi-headline-formula');
+  if (headlineVal) {
+    headlineVal.textContent = `${pnlSign}${idr(Math.abs(totalPnl))}`;
+    headlineVal.className = 'roi-headline-value ' + (totalPnl >= 0 ? 'positive' : 'negative');
+  }
+  if (headlineForm) {
+    headlineForm.innerHTML = `<strong>${pnlPctStr}</strong> dari ${idr(totalModal)} modal · ${computed.length} pembelian · holding ${formatHoldingPeriod(totalDays)}`;
+  }
 
   // CAGR
   const cagrEl = document.getElementById('roi-cagr');
