@@ -1218,3 +1218,103 @@ input[type="number"] {
   font-size: 12px;
   font-weight: 500;
 }
+
+/* ----- ROI multi-row layout ----- */
+.roi-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0 12px;
+}
+
+.roi-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr 32px;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+
+.roi-row:hover {
+  border-color: rgba(212, 175, 55, 0.25);
+}
+
+.roi-row-delete {
+  align-self: stretch;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: 0;
+}
+
+.roi-row-delete:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Hide delete button on the only remaining row */
+.roi-rows:has(.roi-row:only-child) .roi-row-delete {
+  visibility: hidden;
+}
+
+.roi-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  margin-top: 4px;
+}
+
+.roi-add-btn:hover {
+  background: rgba(212, 175, 55, 0.08);
+  color: var(--gold);
+  border-color: var(--gold);
+  border-style: solid;
+}
+
+.roi-add-btn svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .roi-row {
+    grid-template-columns: 1fr 32px;
+    grid-template-areas:
+      "date del"
+      "size size"
+      "grams grams";
+  }
+  .roi-row .roi-input-group:nth-child(1) { grid-area: date; }
+  .roi-row .roi-input-group:nth-child(2) { grid-area: size; }
+  .roi-row .roi-input-group:nth-child(3) { grid-area: grams; }
+  .roi-row-delete {
+    grid-area: del;
+    align-self: end;
+  }
+}

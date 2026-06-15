@@ -243,36 +243,47 @@
         </div>
       </div>
 
-      <div class="roi-form-row">
-        <div class="roi-input-group">
-          <label for="roi-buy-date">Tanggal Pembelian</label>
-          <input type="date" id="roi-buy-date">
-        </div>
-        <div class="roi-input-group">
-          <label for="roi-size-ref">Ukuran Referensi</label>
-          <select id="roi-size-ref">
-            <option value="0.5">0.5g</option>
-            <option value="1" selected>1g</option>
-            <option value="2">2g</option>
-            <option value="3">3g</option>
-            <option value="5">5g</option>
-            <option value="10">10g</option>
-            <option value="25">25g</option>
-            <option value="50">50g</option>
-            <option value="100">100g</option>
-            <option value="250">250g</option>
-            <option value="500">500g</option>
-            <option value="1000">1000g</option>
-          </select>
-        </div>
-        <div class="roi-input-group">
-          <label for="roi-grams">Berat (gram)</label>
-          <div class="calc-input-wrap">
-            <input type="number" id="roi-grams" min="0.1" max="10000" step="0.1" value="" inputmode="decimal" placeholder="contoh: 10">
-            <span class="calc-input-suffix">gram</span>
+      <div class="roi-rows" id="roi-rows">
+        <!-- Row 1 (default, template) -->
+        <div class="roi-row" data-row-id="0">
+          <div class="roi-input-group">
+            <label>Tanggal Pembelian</label>
+            <input type="date" class="roi-buy-date">
           </div>
+          <div class="roi-input-group">
+            <label>Ukuran Referensi</label>
+            <select class="roi-size-ref">
+              <option value="0.5">0.5g</option>
+              <option value="1" selected>1g</option>
+              <option value="2">2g</option>
+              <option value="3">3g</option>
+              <option value="5">5g</option>
+              <option value="10">10g</option>
+              <option value="25">25g</option>
+              <option value="50">50g</option>
+              <option value="100">100g</option>
+              <option value="250">250g</option>
+              <option value="500">500g</option>
+              <option value="1000">1000g</option>
+            </select>
+          </div>
+          <div class="roi-input-group">
+            <label>Berat (gram)</label>
+            <div class="calc-input-wrap">
+              <input type="number" class="roi-grams" min="0.1" max="10000" step="0.1" value="" inputmode="decimal" placeholder="contoh: 10">
+              <span class="calc-input-suffix">gram</span>
+            </div>
+          </div>
+          <button class="roi-row-delete" type="button" title="Hapus baris ini" aria-label="Hapus baris">×</button>
         </div>
       </div>
+
+      <button class="roi-add-btn" id="roi-add-btn" type="button">
+        <svg viewBox="0 0 16 16" width="14" height="14" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M8 3 L8 13 M3 8 L13 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Tambah Pembelian
+      </button>
 
       <div class="roi-result-grid">
         <div class="roi-result-card">
