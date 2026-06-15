@@ -18,8 +18,9 @@ import csv
 import os
 from datetime import datetime
 
-ROHMATS_SELL_URL = "https://raw.githubusercontent.com/rohmats/antam-gold-price/main/data/sell/gold-sell-2026-06-14.json"
-ROHMATS_BUY_URL = "https://raw.githubusercontent.com/rohmats/antam-gold-price/main/data/buy/gold-buy-2026-06-14.json"
+TODAY = datetime.now().strftime("%Y-%m-%d")
+ROHMATS_SELL_URL = f"https://raw.githubusercontent.com/rohmats/antam-gold-price/main/data/sell/gold-sell-{TODAY}.json"
+ROHMATS_BUY_URL = f"https://raw.githubusercontent.com/rohmats/antam-gold-price/main/data/buy/gold-buy-{TODAY}.json"
 
 # Real Antam pricing ratios (1g base) — captured 2026-06-14 from logam-mulia-api
 # Per-gram price decreases as size increases (volume discount)
@@ -244,11 +245,13 @@ def main():
     buy_daily = fetch_rohmats_history(ROHMATS_BUY_URL)
 
     # 3. Fill missing dates in our range
-    sell_daily = fill_missing_dates(sell_daily, start_date="2025-01-01", end_date="2026-06-14")
+    sell_end = max(sell_daily.keys()) if sell_daily else TODAY
+    sell_daily = fill_missing_dates(sell_daily, start_date="2025-01-01", end_date=sell_end)
     # Buyback: fill from its own start date
     if buy_daily:
         buy_earliest = min(buy_daily.keys())
-        buy_daily = fill_missing_dates(buy_daily, start_date=buy_earliest, end_date="2026-06-14")
+        buy_end = max(buy_daily.keys())
+        buy_daily = fill_missing_dates(buy_daily, start_date=buy_earliest, end_date=buy_end)
 
     # 4. Apply sell ratios
     sell_rows = apply_ratios(sell_daily, name="sell")
@@ -257,12 +260,13 @@ def main():
     rows = merge_sell_buy(sell_rows, buy_daily)
 
     # 6. Sanity check
-    print(f"\n📊 Sample data (2026-06-13):")
-    sample = next(r for r in rows if r["date"] == "2026-06-13")
-    print(f"   1g sell:    Rp {int(sample['antam_1g_idr']):,}")
-    print(f"   1g buyback: Rp {int(sample['antam_1g_buyback_idr']):,}")
-    print(f"   Spread:     Rp {int(sample['antam_1g_idr']) - int(sample['antam_1g_buyback_idr']):,} "
-          f"({(int(sample['antam_1g_idr']) - int(sample['antam_1g_buyback_idr']))/int(sample['antam_1g_buyback_idr'])*100:.2f}%)")
+    last_record = rows[-1] if rows else None
+    if last_record:
+        print(f"\n📊 Sample data (latest: {last_record['date']}):")
+        print(f"   1g sell:    Rp {int(last_record['antam_1g_idr']):,}")
+        print(f"   1g buyback: Rp {int(last_record['antam_1g_buyback_idr']):,}")
+        print(f"   Spread:     Rp {int(last_record['antam_1g_idr']) - int(last_record['antam_1g_buyback_idr']):,} "
+              f"({(int(last_record['antam_1g_idr']) - int(last_record['antam_1g_buyback_idr']))/int(last_record['antam_1g_buyback_idr'])*100:.2f}%)")
 
     # 7. Write CSV
     os.chdir(os.path.dirname(os.path.abspath(__file__)))

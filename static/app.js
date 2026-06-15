@@ -94,6 +94,9 @@ function attachListeners() {
     currentYear = e.target.value;
     renderMonthly(allRecords);
   });
+
+  // Calculator listeners
+  attachCalculatorListeners();
 }
 
 function applyQuickRange(range) {
@@ -204,6 +207,9 @@ async function loadData() {
     // Highlight 1T button as active
     document.querySelectorAll('.quick-btn').forEach((b) => b.classList.remove('active'));
     document.querySelector('.quick-btn[data-range="365"]')?.classList.add('active');
+
+    // Calculator: refresh with latest data
+    recalcCalculator();
   } catch (e) {
     console.error('Load failed', e);
   }
@@ -642,4 +648,128 @@ function renderMonthly(records) {
     `;
     tbody.appendChild(tr);
   });
+}
+
+// ====== Calculator Section ======
+let calcMode = 'buyback'; // 'sell' | 'buyback'
+
+function getLatestPrice(field) {
+  // field: 'antam_1g' (sell) or 'antam_1g_buyback' (buyback)
+  if (!allRecords || allRecords.length === 0) return null;
+  for (let i = allRecords.length - 1; i >= 0; i--) {
+    const v = allRecords[i][field];
+    if (v != null) return v;
+  }
+  return null;
+}
+
+function recalcCalculator() {
+  const gramsInput = document.getElementById('calc-grams');
+  const valueEl = document.getElementById('calc-result-value');
+  const formulaEl = document.getElementById('calc-result-formula');
+  const spreadEl = document.getElementById('calc-result-spread');
+  const modeLabelEl = document.getElementById('calc-mode-label');
+
+  const grams = parseFloat(gramsInput.value);
+  const sell = getLatestPrice('antam_1g');
+  const buyback = getLatestPrice('antam_1g_buyback');
+
+  // Update mode-dependent UI
+  valueEl.classList.toggle('sell-mode', calcMode === 'sell');
+  modeLabelEl.textContent = calcMode === 'buyback'
+    ? 'Estimasi nilai buyback berdasarkan harga per gram 1g'
+    : 'Estimasi nilai jual berdasarkan harga per gram 1g';
+
+  // Validation
+  if (!grams || grams <= 0 || isNaN(grams)) {
+    valueEl.textContent = '—';
+    formulaEl.textContent = 'Masukkan gramasi yang valid (min 0.1g)';
+    spreadEl.textContent = '';
+    spreadEl.classList.remove('has-spread');
+    return;
+  }
+  if (grams > 10000) {
+    valueEl.textContent = '—';
+    formulaEl.textContent = 'Maksimal 10.000 gram';
+    spreadEl.textContent = '';
+    spreadEl.classList.remove('has-spread');
+    return;
+  }
+
+  const pricePerGram = calcMode === 'sell' ? sell : buyback;
+  const otherPrice = calcMode === 'sell' ? buyback : sell;
+  const modeLabel = calcMode === 'sell' ? 'Jual' : 'Buyback';
+  const otherLabel = calcMode === 'sell' ? 'buyback' : 'jual';
+
+  if (pricePerGram == null) {
+    valueEl.textContent = '—';
+    formulaEl.textContent = `Data harga ${modeLabel.toLowerCase()} belum tersedia`;
+    spreadEl.textContent = '';
+    spreadEl.classList.remove('has-spread');
+    return;
+  }
+
+  // Main calculation
+  const total = grams * pricePerGram;
+  valueEl.textContent = idr(total);
+  formulaEl.textContent = `${formatGrams(grams)} × ${idr(pricePerGram)}/g (${modeLabel} 1g terakhir)`;
+
+  // Spread info (only show the other side for context)
+  if (otherPrice != null) {
+    const diff = pricePerGram - otherPrice;
+    const diffPct = (diff / otherPrice * 100);
+    const sign = diff >= 0 ? '+' : '';
+    const emoji = calcMode === 'buyback' ? '⚠️' : '📈';
+    spreadEl.innerHTML = `${emoji} Selisih <strong>${idr(Math.abs(diff))}</strong> (${sign}${diffPct.toFixed(2)}%) per gram dari harga ${otherLabel} 1g`;
+    spreadEl.classList.add('has-spread');
+  } else {
+    spreadEl.textContent = '';
+    spreadEl.classList.remove('has-spread');
+  }
+}
+
+function formatGrams(g) {
+  // Show as integer if whole, else 1 decimal
+  if (g == Math.floor(g)) return g.toString() + 'g';
+  return g.toFixed(1) + 'g';
+}
+
+function setCalcMode(mode) {
+  calcMode = mode;
+  document.querySelectorAll('.calc-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  recalcCalculator();
+}
+
+function attachCalculatorListeners() {
+  const gramsInput = document.getElementById('calc-grams');
+  if (!gramsInput) return;
+
+  gramsInput.addEventListener('input', () => {
+    // Sync quick-buttons active state
+    const v = parseFloat(gramsInput.value);
+    document.querySelectorAll('.calc-quick-btn').forEach((b) => {
+      b.classList.toggle('active', parseFloat(b.dataset.gram) === v);
+    });
+    recalcCalculator();
+  });
+
+  document.querySelectorAll('.calc-quick-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const g = parseFloat(btn.dataset.gram);
+      gramsInput.value = g;
+      document.querySelectorAll('.calc-quick-btn').forEach((b) => {
+        b.classList.toggle('active', b === btn);
+      });
+      recalcCalculator();
+    });
+  });
+
+  document.querySelectorAll('.calc-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setCalcMode(btn.dataset.mode));
+  });
+
+  // Initial render
+  recalcCalculator();
 }

@@ -137,6 +137,54 @@
       </div>
     </section>
 
+    <section class="calc-section">
+      <div class="section-header">
+        <div>
+          <h2>🧮 Kalkulator Nilai Emas Anda</h2>
+          <p class="section-subtitle" id="calc-mode-label">Estimasi nilai buyback berdasarkan harga per gram 1g</p>
+        </div>
+        <div class="calc-mode-toggle" id="calc-mode-toggle">
+          <button class="calc-mode-btn" data-mode="sell">
+            <span class="dot sell"></span>Harga Jual
+          </button>
+          <button class="calc-mode-btn active" data-mode="buyback">
+            <span class="dot buyback"></span>Harga Buyback
+          </button>
+        </div>
+      </div>
+
+      <div class="calc-grid">
+        <div class="calc-input-panel">
+          <div class="calc-input-group">
+            <label for="calc-grams">Gramasi emas Anda</label>
+            <div class="calc-input-wrap">
+              <input type="number" id="calc-grams" min="0.1" max="10000" step="0.1" value="40" inputmode="decimal">
+              <span class="calc-input-suffix">gram</span>
+            </div>
+          </div>
+
+          <div class="calc-quick-presets">
+            <span class="calc-quick-label">Quick:</span>
+            <button class="calc-quick-btn" data-gram="1">1g</button>
+            <button class="calc-quick-btn" data-gram="5">5g</button>
+            <button class="calc-quick-btn" data-gram="10">10g</button>
+            <button class="calc-quick-btn" data-gram="25">25g</button>
+            <button class="calc-quick-btn" data-gram="50">50g</button>
+            <button class="calc-quick-btn" data-gram="100">100g</button>
+            <button class="calc-quick-btn" data-gram="500">500g</button>
+            <button class="calc-quick-btn" data-gram="1000">1kg</button>
+          </div>
+        </div>
+
+        <div class="calc-result-panel">
+          <div class="calc-result-label">Estimasi Nilai</div>
+          <div class="calc-result-value" id="calc-result-value">—</div>
+          <div class="calc-result-formula" id="calc-result-formula">—</div>
+          <div class="calc-result-spread" id="calc-result-spread"></div>
+        </div>
+      </div>
+    </section>
+
     <footer>
       <p>🪙 Antam Dashboard · <span id="data-range">—</span> · <a href="#" id="show-spread-explain">Apa itu spread?</a></p>
     </footer>
