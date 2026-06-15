@@ -1218,6 +1218,13 @@ function computeROI() {
     ? 'Nilai sekarang = harga Buyback Antam × gram (realistis kalau Anda jual balik ke Antam)'
     : 'Nilai sekarang = harga Jual Antam × gram (harga retail kalau Anda beli hari ini)';
 
+  // Color the result cards based on active mode (mirrors Kalkulator Nilai Emas)
+  const gridEl = document.getElementById('roi-result-grid');
+  if (gridEl) {
+    gridEl.classList.toggle('mode-buyback', roiMode === 'buyback');
+    gridEl.classList.toggle('mode-sell', roiMode === 'sell');
+  }
+
   // Initialize defaults on first row if not yet
   const firstRow = document.querySelector('#roi-rows .roi-row');
   if (firstRow) setROIRowDefaults(firstRow);

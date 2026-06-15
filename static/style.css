@@ -1100,12 +1100,51 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  transition: border-color 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.roi-result-card.roi-result-highlight {
-  border-color: rgba(212, 175, 55, 0.35);
-  background: linear-gradient(180deg, rgba(212, 175, 55, 0.06) 0%, var(--bg-card) 100%);
+/* Top accent bar (mirrors .calc-result-panel::before) */
+.roi-result-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold) 50%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Mode-colored treatment (matches Kalkulator Nilai Emas: ijo buyback, merah jual) */
+.roi-result-grid.mode-buyback .roi-result-card {
+  border-color: rgba(16, 185, 129, 0.32);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.06) 0%, var(--bg-card) 100%);
+}
+.roi-result-grid.mode-buyback .roi-result-card::before {
+  background: linear-gradient(90deg, transparent 0%, #10b981 50%, transparent 100%);
+  opacity: 0.75;
+}
+
+.roi-result-grid.mode-sell .roi-result-card {
+  border-color: rgba(248, 113, 113, 0.32);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.06) 0%, var(--bg-card) 100%);
+}
+.roi-result-grid.mode-sell .roi-result-card::before {
+  background: linear-gradient(90deg, transparent 0%, #f87171 50%, transparent 100%);
+  opacity: 0.75;
+}
+
+/* Profit/Loss highlight card — stronger treatment in the active mode color */
+.roi-result-grid.mode-buyback .roi-result-card.roi-result-highlight {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.14) 0%, var(--bg-card) 100%);
+}
+.roi-result-grid.mode-sell .roi-result-card.roi-result-highlight {
+  border-color: rgba(248, 113, 113, 0.55);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.14) 0%, var(--bg-card) 100%);
 }
 
 .roi-result-label {
