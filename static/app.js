@@ -645,7 +645,7 @@ function renderMonthly(records) {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><strong>${monthName}</strong> <span style="color:var(--text-muted); font-size:11px;">${m.days} hari</span></td>
+      <td><strong>${monthName}</strong></td>
       <td style="color:var(--gold); font-weight:600;">${m.avgSell != null ? idr(m.avgSell) : '—'}</td>
       <td>${m.avgBuyback != null ? idr(m.avgBuyback) : '—'}</td>
       <td>${changeCell}</td>
