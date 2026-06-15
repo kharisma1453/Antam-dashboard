@@ -108,7 +108,7 @@ html, body {
 
 .kpi-label {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-bottom: 6px;
