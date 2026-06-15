@@ -535,8 +535,7 @@ function renderMonthly(records) {
   currentYear = currentSelection;
 
   selector.innerHTML = availableYears.map((y) => {
-    const monthsWithData = Object.keys(byYearMonth[y]).length;
-    return `<option value="${y}" ${y === currentSelection ? 'selected' : ''}>${y} (${monthsWithData} bulan)</option>`;
+    return `<option value="${y}" ${y === currentSelection ? 'selected' : ''}>${y}</option>`;
   }).join('');
 
   // Get months for selected year
