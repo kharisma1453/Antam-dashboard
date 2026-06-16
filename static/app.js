@@ -25,7 +25,15 @@ const sellKey = (s) => `antam_${s == Math.floor(s) ? s : s}g`;
 const buybackKey = (s) => `antam_${s == Math.floor(s) ? s : s}g_buyback`;
 
 // ----- Init -----
+// Force scroll to top on every page load/refresh
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+window.scrollTo(0, 0);
+
 document.addEventListener('DOMContentLoaded', () => {
+  // Re-apply on DOMContentLoaded in case content shifted during load
+  window.scrollTo(0, 0);
   buildSizeToggles();
   attachListeners();
   loadData();
