@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
   buildSizeToggles();
   attachListeners();
   loadData();
+  loadPredictions();
 });
 
 function buildSizeToggles() {
@@ -1791,4 +1792,168 @@ const SnakeGame = {
 
 function initSnakeGame() {
   SnakeGame.init();
+}
+
+// =============================================================
+// ML Prediction Panel
+// =============================================================
+let PRED = null;  // predictions.json cache
+let PRED_DATA_LOADED = null;  // last_date from data.json for default dates
+
+function loadPredictions() {
+  return fetch('/data/predictions.json', { cache: 'no-cache' })
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then((json) => {
+      PRED = json;
+      initPredictionPanel();
+    })
+    .catch((err) => {
+      console.error('predictions.json load failed:', err);
+      const status = document.getElementById('pred-status');
+      if (status) {
+        status.textContent = 'Predictions unavailable';
+        status.classList.add('error');
+      }
+    });
+}
+
+function initPredictionPanel() {
+  const sizeSelect = document.getElementById('pred-size');
+  if (!sizeSelect || !PRED) return;
+
+  // Populate size dropdown (default to 1g)
+  const sizeKeys = Object.keys(PRED.sizes);
+  sizeKeys.sort((a, b) => parseFloat(a) - parseFloat(b));
+  sizeKeys.forEach((key) => {
+    const sz = PRED.sizes[key];
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = sz.size_label;
+    if (key === '1') opt.selected = true;
+    sizeSelect.appendChild(opt);
+  });
+
+  // Set default dates: today, +3y
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const future = new Date(today);
+  future.setFullYear(future.getFullYear() + 3);
+  const futureStr = future.toISOString().slice(0, 10);
+
+  document.getElementById('pred-buy-date').value = todayStr;
+  document.getElementById('pred-sell-date').value = futureStr;
+  document.getElementById('pred-pieces').value = 10;
+
+  // Status badge
+  const status = document.getElementById('pred-status');
+  if (status) {
+    const lastDate = PRED.training_range.end;
+    status.textContent = `Model trained ${lastDate}`;
+    status.classList.add('ready');
+  }
+  const modelInfo = document.getElementById('pred-model-info');
+  if (modelInfo) {
+    const n = PRED.training_range.n_days;
+    modelInfo.textContent = `${PRED.library || 'Prophet/ARIMA'} · ${n.toLocaleString('id-ID')} hari training`;
+  }
+
+  // Listeners
+  ['pred-size', 'pred-pieces', 'pred-buy-date', 'pred-sell-date'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', updatePrediction);
+      el.addEventListener('change', updatePrediction);
+    }
+  });
+
+  updatePrediction();
+}
+
+function idrP(n) {
+  if (n == null || isNaN(n)) return '—';
+  return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+}
+
+function findClosestHorizon(sellDate, lastDateStr, horizons) {
+  // Horizons array: [{label, days, date}]
+  if (!sellDate || !horizons.length) return null;
+  const target = new Date(sellDate).getTime();
+  let best = null;
+  let bestDiff = Infinity;
+  for (const h of horizons) {
+    const hd = new Date(h.date).getTime();
+    const diff = Math.abs(hd - target);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = h;
+    }
+  }
+  return best;
+}
+
+function updatePrediction() {
+  if (!PRED) return;
+  const sizeKey = document.getElementById('pred-size').value;
+  const pieces = parseInt(document.getElementById('pred-pieces').value, 10);
+  const sellDate = document.getElementById('pred-sell-date').value;
+
+  const sz = PRED.sizes[sizeKey];
+  if (!sz || !pieces || !sellDate) {
+    // Reset display
+    ['pred-bear-value', 'pred-base-value', 'pred-bull-value'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+    ['pred-bear-pct', 'pred-base-pct', 'pred-bull-pct'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = '—';
+    });
+    return;
+  }
+
+  const horizon = findClosestHorizon(sellDate, sz.current_date, sz.predictions);
+  if (!horizon) return;
+
+  const buyPrice = sz.current_price;
+  const buyCost = buyPrice * pieces;
+
+  // Bear/Base/Bull use p25/base/p75
+  const scenarios = [
+    { key: 'bear', price: horizon.p25, label: 'bear', cls: 'pred-bear' },
+    { key: 'base', price: horizon.base, label: 'base', cls: 'pred-base' },
+    { key: 'bull', price: horizon.p75, label: 'bull', cls: 'pred-bull' },
+  ];
+
+  scenarios.forEach((sc) => {
+    const sellValue = sc.price * pieces;
+    const pnl = sellValue - buyCost;
+    const pct = (pnl / buyCost) * 100;
+    const sign = pnl >= 0 ? '+' : '−';
+    const cls = sc.key;
+    const valEl = document.getElementById(`pred-${cls}-value`);
+    const pctEl = document.getElementById(`pred-${cls}-pct`);
+    const noteEl = document.getElementById(`pred-${cls}-note`);
+    if (valEl) valEl.textContent = sign + idrP(Math.abs(pnl));
+    if (pctEl) pctEl.textContent = `${sign}${(Math.abs(pct)).toFixed(2)}% · ${sign}${idrP(Math.abs(pnl))}`;
+    if (noteEl) {
+      noteEl.innerHTML = `Jual: ${sign}${idrP(Math.abs(sellValue))}<br>Modal: ${idrP(buyCost)}`;
+    }
+  });
+
+  // Meta
+  const setMeta = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+  setMeta('pred-buy-price', idrP(buyPrice) + ' / ' + sz.size_label);
+  setMeta('pred-cagr-5y', sz.cagr_5y != null ? `${sz.cagr_5y >= 0 ? '+' : ''}${sz.cagr_5y.toFixed(2)}%` : '—');
+  setMeta('pred-cagr-10y', sz.cagr_10y != null ? `${sz.cagr_10y >= 0 ? '+' : ''}${sz.cagr_10y.toFixed(2)}%` : '—');
+  setMeta('pred-horizon', `${horizon.horizon} (${horizon.date})`);
+  // CI: p5-p95 range
+  const ciLow = horizon.p5;
+  const ciHigh = horizon.p95;
+  setMeta('pred-ci', `${idrP(ciLow)} – ${idrP(ciHigh)}`);
 }

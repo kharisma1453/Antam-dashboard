@@ -1639,3 +1639,198 @@ input[type="number"] {
   }
   .game-stats { margin-top: 8px; }
 }
+
+/* ====== ML Prediction Section ====== */
+.pred-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--gold);
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow);
+}
+
+.pred-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.pred-status.ready { color: var(--gold); border-color: var(--gold); }
+.pred-status.error { color: #f87171; border-color: rgba(248, 113, 113, 0.4); }
+
+.pred-form {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 18px 0 16px;
+}
+
+.pred-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pred-input-group label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.pred-input-group input,
+.pred-input-group select {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.pred-input-group input:focus,
+.pred-input-group select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+}
+
+.pred-result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.pred-scenario-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px 20px;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pred-scenario-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.pred-scenario-card.pred-bear {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.08) 0%, var(--bg-elevated) 100%);
+}
+
+.pred-scenario-card.pred-base {
+  border-color: rgba(212, 175, 55, 0.45);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.10) 0%, var(--bg-elevated) 100%);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.2);
+}
+
+.pred-scenario-card.pred-bull {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, var(--bg-elevated) 100%);
+}
+
+.pred-scenario-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.pred-scenario-card.pred-bear .pred-scenario-label { color: #fca5a5; }
+.pred-scenario-card.pred-base .pred-scenario-label { color: var(--gold); }
+.pred-scenario-card.pred-bull .pred-scenario-label { color: #6ee7b7; }
+
+.pred-scenario-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pred-scenario-card.pred-bear .pred-scenario-value { color: #fca5a5; }
+.pred-scenario-card.pred-bull .pred-scenario-value { color: #6ee7b7; }
+
+.pred-scenario-pct {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pred-scenario-card.pred-bear .pred-scenario-pct { color: #fca5a5; }
+.pred-scenario-card.pred-bull .pred-scenario-pct { color: #6ee7b7; }
+
+.pred-scenario-note {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  line-height: 1.4;
+}
+
+.pred-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 16px 0 12px;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.pred-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pred-meta-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.pred-meta-value {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pred-disclaimer {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .pred-form { grid-template-columns: repeat(2, 1fr); }
+  .pred-result-grid { grid-template-columns: 1fr; }
+  .pred-scenario-value { font-size: 18px; }
+}

@@ -376,6 +376,86 @@
       </div>
     </section>
 
+    <section class="pred-section" id="pred-section">
+      <div class="section-header">
+        <div>
+          <h2>🤖 Prediksi Nilai Emas (ML)</h2>
+          <p class="section-subtitle">Proyeksi harga emas masa depan berdasarkan time series analysis dari 15+ tahun data historis. <span id="pred-model-info">—</span></p>
+        </div>
+        <div class="pred-status" id="pred-status">Loading predictions...</div>
+      </div>
+
+      <div class="pred-form">
+        <div class="pred-input-group">
+          <label>Ukuran</label>
+          <select id="pred-size" class="pred-size"></select>
+        </div>
+        <div class="pred-input-group">
+          <label>Jumlah Kepingan</label>
+          <div class="calc-input-wrap">
+            <input type="number" id="pred-pieces" min="1" max="10000" step="1" value="10" inputmode="numeric" placeholder="contoh: 10">
+            <span class="calc-input-suffix">keping</span>
+          </div>
+        </div>
+        <div class="pred-input-group">
+          <label>Tanggal Beli</label>
+          <input type="date" id="pred-buy-date">
+        </div>
+        <div class="pred-input-group">
+          <label>Tanggal Jual (Target)</label>
+          <input type="date" id="pred-sell-date">
+        </div>
+      </div>
+
+      <div class="pred-result-grid" id="pred-result-grid">
+        <div class="pred-scenario-card pred-bear">
+          <div class="pred-scenario-label">🐻 BEAR CASE</div>
+          <div class="pred-scenario-value" id="pred-bear-value">—</div>
+          <div class="pred-scenario-pct" id="pred-bear-pct">—</div>
+          <div class="pred-scenario-note" id="pred-bear-note">—</div>
+        </div>
+        <div class="pred-scenario-card pred-base">
+          <div class="pred-scenario-label">📊 BASE CASE (Paling Mungkin)</div>
+          <div class="pred-scenario-value" id="pred-base-value">—</div>
+          <div class="pred-scenario-pct" id="pred-base-pct">—</div>
+          <div class="pred-scenario-note" id="pred-base-note">—</div>
+        </div>
+        <div class="pred-scenario-card pred-bull">
+          <div class="pred-scenario-label">🐂 BULL CASE</div>
+          <div class="pred-scenario-value" id="pred-bull-value">—</div>
+          <div class="pred-scenario-pct" id="pred-bull-pct">—</div>
+          <div class="pred-scenario-note" id="pred-bull-note">—</div>
+        </div>
+      </div>
+
+      <div class="pred-meta" id="pred-meta">
+        <div class="pred-meta-item">
+          <span class="pred-meta-label">Harga beli saat ini</span>
+          <span class="pred-meta-value" id="pred-buy-price">—</span>
+        </div>
+        <div class="pred-meta-item">
+          <span class="pred-meta-label">CAGR 5 tahun historis</span>
+          <span class="pred-meta-value" id="pred-cagr-5y">—</span>
+        </div>
+        <div class="pred-meta-item">
+          <span class="pred-meta-label">CAGR 10 tahun historis</span>
+          <span class="pred-meta-value" id="pred-cagr-10y">—</span>
+        </div>
+        <div class="pred-meta-item">
+          <span class="pred-meta-label">Horizon terdekat</span>
+          <span class="pred-meta-value" id="pred-horizon">—</span>
+        </div>
+        <div class="pred-meta-item">
+          <span class="pred-meta-label">Confidence interval</span>
+          <span class="pred-meta-value" id="pred-ci">—</span>
+        </div>
+      </div>
+
+      <div class="pred-disclaimer">
+        ⚠️ Prediksi berdasarkan time series (Holt-Winters) trained on data historis. Bukan saran finansial. Pasar bisa bergerak berlawanan dengan tren historis.
+      </div>
+    </section>
+
     <footer>
       <p>🪙 Antam Dashboard · <span id="data-range">—</span> · <a href="#" id="show-spread-explain">Apa itu spread?</a></p>
     </footer>
