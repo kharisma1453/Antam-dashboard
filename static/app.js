@@ -1171,14 +1171,14 @@ function formatDateID(dateStr) {
 }
 
 function getROIRows() {
-  // Read all visible rows; return array of {id, buyDate, sizeRef, grams, valid}
+  // Read all visible rows; return array of {id, buyDate, sizeRef, pieces, valid}
   const rows = document.querySelectorAll('#roi-rows .roi-row');
   return Array.from(rows).map((row) => {
     const id = row.dataset.rowId;
     const buyDate = row.querySelector('.roi-buy-date').value;
     const sizeRef = row.querySelector('.roi-size-ref').value;
-    const grams = parseFloat(row.querySelector('.roi-grams').value);
-    return { id, buyDate, sizeRef, grams, valid: !!(buyDate && sizeRef && grams && grams > 0) };
+    const pieces = parseInt(row.querySelector('.roi-grams').value, 10);
+    return { id, buyDate, sizeRef, pieces, valid: !!(buyDate && sizeRef && pieces && pieces > 0) };
   });
 }
 
@@ -1250,12 +1250,12 @@ function computeROI() {
 
   // Reset outputs
   const reset = () => {
-    ['roi-modal', 'roi-current', 'roi-pnl', 'roi-cagr'].forEach((id) => {
+    ['roi-grams', 'roi-modal', 'roi-current', 'roi-pnl', 'roi-cagr'].forEach((id) => {
       const el = document.getElementById(id);
       el.textContent = '—';
       el.className = 'roi-result-value neutral';
     });
-    ['roi-modal-detail', 'roi-current-detail', 'roi-pnl-detail', 'roi-cagr-detail'].forEach((id) => {
+    ['roi-grams-detail', 'roi-modal-detail', 'roi-current-detail', 'roi-pnl-detail', 'roi-cagr-detail'].forEach((id) => {
       document.getElementById(id).textContent = '—';
     });
     document.getElementById('roi-period').textContent = '—';
@@ -1280,6 +1280,8 @@ function computeROI() {
     const buyIdx = findClosestDateIndex(r.buyDate);
     if (buyIdx < 0) return null;
     const actualBuyDate = rawDates[buyIdx];
+    const sizeRefGrams = parseFloat(r.sizeRef);  // e.g., 1, 5, 10 (grams per piece)
+    const rowGrams = r.pieces * sizeRefGrams;    // total grams for this row
     const sizeKeyBuy = buildSizeKey(r.sizeRef, 'sell');
     const sizeKeyNow = buildSizeKey(r.sizeRef, roiMode);
     const buyPrice = rawColumns[sizeKeyBuy] ? rawColumns[sizeKeyBuy][buyIdx] : null;
@@ -1290,9 +1292,11 @@ function computeROI() {
       actualBuyDate,
       buyPrice,
       currentPrice,
-      modal: buyPrice * r.grams,
-      current: currentPrice * r.grams,
-      pnl: (currentPrice - buyPrice) * r.grams,
+      sizeRefGrams,
+      rowGrams,
+      modal: buyPrice * r.pieces,
+      current: currentPrice * r.pieces,
+      pnl: (currentPrice - buyPrice) * r.pieces,
     };
   }).filter(Boolean);
 
@@ -1303,7 +1307,7 @@ function computeROI() {
   }
 
   // Aggregate
-  const totalGrams = computed.reduce((s, r) => s + r.grams, 0);
+  const totalGrams = computed.reduce((s, r) => s + r.rowGrams, 0);
   const totalModal = computed.reduce((s, r) => s + r.modal, 0);
   const totalCurrent = computed.reduce((s, r) => s + r.current, 0);
   const totalPnl = totalCurrent - totalModal;
@@ -1322,8 +1326,19 @@ function computeROI() {
   // Detail breakdowns
   const breakdown = computed.map((r) => {
     const sizeLabel = r.sizeRef.replace('.', ',') + 'g';
-    return `${r.grams}g · ${sizeLabel} @ ${formatDateID(r.actualBuyDate)}`;
+    return `${r.pieces}× ${sizeLabel} = ${r.rowGrams}g @ ${formatDateID(r.actualBuyDate)}`;
   }).join(' + ');
+
+  // Total Gramasi
+  const gramsEl = document.getElementById('roi-grams');
+  if (gramsEl) {
+    gramsEl.textContent = `${totalGrams.toLocaleString('id-ID', { maximumFractionDigits: 2 })} g`;
+    gramsEl.className = 'roi-result-value';
+  }
+  const gramsDetailEl = document.getElementById('roi-grams-detail');
+  if (gramsDetailEl) {
+    gramsDetailEl.textContent = `${computed.length} pembelian · ${breakdown}`;
+  }
 
   // Modal
   document.getElementById('roi-modal').textContent = idr(totalModal);
