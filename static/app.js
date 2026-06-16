@@ -1408,8 +1408,8 @@ function attachROICalculatorListeners() {
 const SnakeGame = {
   canvas: null,
   ctx: null,
-  gridCols: 20,
-  gridRows: 50,
+  gridCols: 50,
+  gridRows: 20,
   cellSize: 20,
   snake: [],
   direction: { x: 1, y: 0 },
@@ -1474,7 +1474,7 @@ const SnakeGame = {
   },
 
   reset() {
-    this.snake = [{ x: 10, y: 25 }, { x: 9, y: 25 }, { x: 8, y: 25 }];
+    this.snake = [{ x: 25, y: 10 }, { x: 24, y: 10 }, { x: 23, y: 10 }];
     this.direction = { x: 1, y: 0 };
     this.nextDirection = { x: 1, y: 0 };
     this.score = 0;
