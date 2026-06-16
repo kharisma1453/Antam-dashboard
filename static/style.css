@@ -1858,6 +1858,102 @@ input[type="number"] {
   cursor: not-allowed;
 }
 
+/* Right-click context menu on trend windows */
+.trend-context-menu {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 220px;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  z-index: 100000;
+  font-size: 12px;
+  color: var(--text);
+  user-select: none;
+  animation: trendContextIn 0.12s ease-out;
+}
+@keyframes trendContextIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.trend-context-header {
+  padding: 6px 10px;
+  font-weight: 700;
+  color: var(--gold);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.trend-context-header .trend-context-subtitle {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 400;
+}
+.trend-context-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+.trend-context-item:hover {
+  background: var(--bg-card);
+}
+.trend-context-item.danger {
+  color: var(--red);
+}
+.trend-context-item.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+.trend-context-sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+.trend-context-check,
+.trend-context-caret {
+  color: var(--text-dim);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.trend-context-check.checked {
+  color: var(--gold);
+  font-weight: 700;
+}
+.trend-context-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.trend-context-submenu {
+  margin-left: -2px;
+}
+.trend-context-label-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.trend-context-label-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 /* Mobile: stack library on top of canvas */
 @media (max-width: 720px) {
   .trends-layout {

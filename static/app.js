@@ -2491,6 +2491,9 @@ function setupTrendWindowInteractions(trend) {
     trend.selected = e.target.checked;
     updateTrendCombineButton();
   });
+
+  // Right-click context menu
+  setupTrendContextMenu(trend);
 }
 
 function getRecordsForTrendDateRange(startDate, endDate) {
@@ -2810,6 +2813,9 @@ function combineTrends(trends, opts = {}) {
     saveTrendLayout();
   });
 
+  // Right-click context menu
+  setupTrendContextMenu(trend);
+
   // Drag window
   el.addEventListener('mousedown', () => { el.style.zIndex = ++trendZIndex; });
   const header = el.querySelector('.trend-window-header');
@@ -2861,6 +2867,396 @@ function combineTrends(trends, opts = {}) {
   });
 
   hideTrendCanvasEmpty();
+  saveTrendLayout();
+}
+
+// ====== Right-click context menu for trend windows ======
+
+function setupTrendContextMenu(trend) {
+  trend.el.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    showTrendContextMenu(trend, e.clientX, e.clientY);
+  });
+}
+
+function hideTrendContextMenu() {
+  document.querySelectorAll('.trend-context-menu').forEach(el => el.remove());
+}
+
+function showTrendContextMenu(trend, clientX, clientY) {
+  hideTrendContextMenu();
+  const isCombined = trend.sizeKey === 'combined';
+  const title = isCombined
+    ? `🔗 ${trend.combinedSizes.length} sizes`
+    : formatTrendSize(trend.sizeKey);
+  const subtitle = isCombined
+    ? (trend.normalized ? 'normalized' : `axis: ${formatTrendSize(trend.yRefSize)}`)
+    : (trend.normalized ? 'normalized' : 'price');
+
+  const menu = document.createElement('div');
+  menu.className = 'trend-context-menu';
+
+  // Build menu items
+  let html = '';
+  html += `<div class="trend-context-header">
+    <span>${title}</span>
+    <span class="trend-context-subtitle">${subtitle}</span>
+  </div>`;
+
+  // Date range
+  html += `<div class="trend-context-item" data-action="focus-start">
+    <span class="trend-context-label-left">📅 Start</span>
+    <span class="trend-context-label-right"><b>${trend.startDate ? formatMMDDYYYY(trend.startDate) : '*'}</b></span>
+  </div>`;
+  html += `<div class="trend-context-item" data-action="focus-end">
+    <span class="trend-context-label-left">📅 End</span>
+    <span class="trend-context-label-right"><b>${trend.endDate ? formatMMDDYYYY(trend.endDate) : '*'}</b></span>
+  </div>`;
+
+  // Normalize toggle
+  html += `<div class="trend-context-item" data-action="toggle-norm">
+    <span class="trend-context-label-left">📐 Normalize (100)</span>
+    <span class="trend-context-check ${trend.normalized ? 'checked' : ''}">${trend.normalized ? '✓' : ''}</span>
+  </div>`;
+
+  // Y-axis reference (combined only)
+  if (isCombined) {
+    html += `<div class="trend-context-item" data-action="set-yref">
+      <span class="trend-context-label-left">🎯 Y-axis</span>
+      <span class="trend-context-label-right"><b>${formatTrendSize(trend.yRefSize)}</b> <span class="trend-context-caret">▸</span></span>
+    </div>`;
+  }
+
+  html += `<hr class="trend-context-sep">`;
+
+  // Add / remove size
+  if (isCombined) {
+    const available = getValidSizeKeys().filter(sk => !trend.combinedSizes.includes(sk));
+    if (available.length) {
+      html += `<div class="trend-context-item" data-action="add-size">
+        <span class="trend-context-label-left">➕ Add size</span>
+        <span class="trend-context-label-right"><span class="trend-context-caret">▸</span></span>
+      </div>`;
+    }
+    if (trend.combinedSizes.length > 1) {
+      html += `<div class="trend-context-item" data-action="remove-size">
+        <span class="trend-context-label-left">➖ Remove size</span>
+        <span class="trend-context-label-right"><span class="trend-context-caret">▸</span></span>
+      </div>`;
+    }
+  } else {
+    html += `<div class="trend-context-item" data-action="convert-combined">
+      <span class="trend-context-label-left">🔗 Convert to combined</span>
+      <span class="trend-context-label-right"><span class="trend-context-caret">▸</span></span>
+    </div>`;
+  }
+
+  html += `<hr class="trend-context-sep">`;
+
+  // Export
+  html += `<div class="trend-context-item" data-action="export">
+    <span class="trend-context-label-left">📤 Export CSV</span>
+    <span class="trend-context-label-right"></span>
+  </div>`;
+
+  // Reset
+  html += `<div class="trend-context-item" data-action="reset">
+    <span class="trend-context-label-left">↻ Reset to defaults</span>
+    <span class="trend-context-label-right"></span>
+  </div>`;
+
+  // Close
+  html += `<div class="trend-context-item danger" data-action="close">
+    <span class="trend-context-label-left">🗑️ Close trend</span>
+    <span class="trend-context-label-right"></span>
+  </div>`;
+
+  menu.innerHTML = html;
+  document.body.appendChild(menu);
+
+  // Position at cursor, clamp to viewport
+  const rect = menu.getBoundingClientRect();
+  const maxX = window.innerWidth - rect.width - 8;
+  const maxY = window.innerHeight - rect.height - 8;
+  menu.style.left = Math.max(8, Math.min(clientX, maxX)) + 'px';
+  menu.style.top = Math.max(8, Math.min(clientY, maxY)) + 'px';
+
+  // Wire items
+  menu.querySelectorAll('.trend-context-item').forEach(item => {
+    const action = item.dataset.action;
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      handleContextAction(trend, action, item, menu);
+    });
+    // Submenu: show on hover
+    if (['set-yref', 'add-size', 'remove-size', 'convert-combined'].includes(action)) {
+      item.addEventListener('mouseenter', () => showContextSubmenu(trend, item, action, menu));
+    }
+  });
+
+  // Close on outside click / Escape
+  setTimeout(() => {
+    document.addEventListener('mousedown', closeContextOnOutside, { once: true, capture: true });
+    document.addEventListener('keydown', closeContextOnEscape, { once: true });
+    document.addEventListener('contextmenu', closeContextOnOutside, { once: true, capture: true });
+  }, 50);
+}
+
+function closeContextOnOutside(e) {
+  // Close if click is outside any context menu
+  if (!e.target.closest('.trend-context-menu')) {
+    hideTrendContextMenu();
+  } else {
+    // Click inside menu, re-arm the listener for next outside click
+    setTimeout(() => {
+      document.addEventListener('mousedown', closeContextOnOutside, { once: true, capture: true });
+    }, 50);
+  }
+}
+
+function closeContextOnEscape(e) {
+  if (e.key === 'Escape') hideTrendContextMenu();
+}
+
+function showContextSubmenu(trend, parentItem, action, parentMenu) {
+  // Remove any existing submenu
+  document.querySelectorAll('.trend-context-submenu').forEach(el => el.remove());
+
+  const sub = document.createElement('div');
+  sub.className = 'trend-context-menu trend-context-submenu';
+
+  let html = '';
+  if (action === 'set-yref') {
+    html += `<div class="trend-context-header"><span>Pilih Y-axis</span></div>`;
+    trend.combinedSizes.forEach(sk => {
+      const isRef = sk === trend.yRefSize;
+      html += `<div class="trend-context-item" data-action="set-yref-pick" data-size="${sk}">
+        <span class="trend-context-label-left"><span class="trend-context-dot" style="background: ${getTrendColor(sk)}"></span>${formatTrendSize(sk)}</span>
+        <span class="trend-context-check ${isRef ? 'checked' : ''}">${isRef ? '✓' : ''}</span>
+      </div>`;
+    });
+  } else if (action === 'add-size') {
+    html += `<div class="trend-context-header"><span>Add size</span></div>`;
+    const available = getValidSizeKeys().filter(sk => !trend.combinedSizes.includes(sk));
+    available.forEach(sk => {
+      html += `<div class="trend-context-item" data-action="add-size-pick" data-size="${sk}">
+        <span class="trend-context-label-left"><span class="trend-context-dot" style="background: ${getTrendColor(sk)}"></span>${formatTrendSize(sk)}</span>
+        <span class="trend-context-label-right"></span>
+      </div>`;
+    });
+  } else if (action === 'remove-size') {
+    html += `<div class="trend-context-header"><span>Hapus size</span></div>`;
+    trend.combinedSizes.forEach(sk => {
+      html += `<div class="trend-context-item" data-action="remove-size-pick" data-size="${sk}">
+        <span class="trend-context-label-left"><span class="trend-context-dot" style="background: ${getTrendColor(sk)}"></span>${formatTrendSize(sk)}</span>
+        <span class="trend-context-label-right">✕</span>
+      </div>`;
+    });
+  } else if (action === 'convert-combined') {
+    html += `<div class="trend-context-header"><span>Combine dengan</span></div>`;
+    const available = getValidSizeKeys().filter(sk => sk !== trend.sizeKey);
+    available.forEach(sk => {
+      html += `<div class="trend-context-item" data-action="convert-pick" data-size="${sk}">
+        <span class="trend-context-label-left"><span class="trend-context-dot" style="background: ${getTrendColor(sk)}"></span>${formatTrendSize(sk)}</span>
+        <span class="trend-context-label-right"></span>
+      </div>`;
+    });
+  }
+
+  sub.innerHTML = html;
+  document.body.appendChild(sub);
+
+  // Position next to parent (try right side, then left, then down)
+  const parentRect = parentItem.getBoundingClientRect();
+  const subRect = sub.getBoundingClientRect();
+  const maxX = window.innerWidth - subRect.width - 8;
+  let left = parentRect.right - 4;
+  if (left > maxX) left = parentRect.left - subRect.width + 4;
+  if (left < 8) left = 8;
+  sub.style.left = left + 'px';
+  // Align top with parent
+  let top = parentRect.top;
+  if (top + subRect.height > window.innerHeight - 8) {
+    top = window.innerHeight - subRect.height - 8;
+  }
+  sub.style.top = Math.max(8, top) + 'px';
+
+  // Wire submenu items
+  sub.querySelectorAll('.trend-context-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.stopPropagation();
+      const act = item.dataset.action;
+      const sk = item.dataset.size;
+      if (act === 'set-yref-pick') {
+        trend.yRefSize = sk;
+        const yrefSelect = trend.el.querySelector('.trend-yref-select');
+        if (yrefSelect) yrefSelect.value = sk;
+        rebuildCombinedChart(trend);
+        saveTrendLayout();
+        hideTrendContextMenu();
+      } else if (act === 'add-size-pick') {
+        addSizeToTrend(trend, sk);
+        hideTrendContextMenu();
+      } else if (act === 'remove-size-pick') {
+        removeSizeFromTrend(trend, sk);
+        hideTrendContextMenu();
+      } else if (act === 'convert-pick') {
+        // Convert single → combined at same position
+        const startDate = trend.startDate || null;
+        const endDate = trend.endDate || null;
+        const x = trend.x, y = trend.y, w = trend.w, h = trend.h;
+        // Tear down source
+        if (trend.chart) trend.chart.destroy();
+        trend.el.remove();
+        TRENDS = TRENDS.filter(t => t.id !== trend.id);
+        combineTrends([
+          { sizeKey: trend.sizeKey, normalized: false },
+          { sizeKey: sk, normalized: false },
+        ], { x, y, w, h, startDate, endDate });
+        hideTrendContextMenu();
+      }
+    });
+  });
+}
+
+function handleContextAction(trend, action, item, menu) {
+  switch (action) {
+    case 'focus-start': {
+      hideTrendContextMenu();
+      const input = trend.el.querySelector('.trend-date-start');
+      input.focus();
+      input.select();
+      break;
+    }
+    case 'focus-end': {
+      hideTrendContextMenu();
+      const input = trend.el.querySelector('.trend-date-end');
+      input.focus();
+      input.select();
+      break;
+    }
+    case 'toggle-norm': {
+      trend.normalized = !trend.normalized;
+      if (trend.sizeKey === 'combined') {
+        const yrefSelect = trend.el.querySelector('.trend-yref-select');
+        if (yrefSelect) yrefSelect.disabled = trend.normalized;
+        rebuildCombinedChart(trend);
+      } else {
+        const normCb = trend.el.querySelector('.trend-norm-checkbox');
+        if (normCb) normCb.checked = trend.normalized;
+        createTrendChart(trend);
+      }
+      saveTrendLayout();
+      hideTrendContextMenu();
+      break;
+    }
+    case 'export': {
+      exportTrendData(trend);
+      hideTrendContextMenu();
+      break;
+    }
+    case 'reset': {
+      resetTrendToDefaults(trend);
+      hideTrendContextMenu();
+      break;
+    }
+    case 'close': {
+      if (trend.sizeKey === 'combined') {
+        if (trend.chart) trend.chart.destroy();
+        trend.el.remove();
+        TRENDS = TRENDS.filter(t => t.id !== trend.id);
+        showTrendCanvasEmpty();
+      } else {
+        trend.el.querySelector('.trend-close-btn').click();
+      }
+      hideTrendContextMenu();
+      break;
+    }
+    // Submenu actions are handled in showContextSubmenu
+    case 'set-yref':
+    case 'add-size':
+    case 'remove-size':
+    case 'convert-combined':
+      // Don't hide — submenu will open on hover
+      break;
+  }
+}
+
+function exportTrendData(trend) {
+  const records = getRecordsForTrendDateRange(trend.startDate, trend.endDate);
+  if (!records.length) {
+    alert('No data in range to export');
+    return;
+  }
+  const dates = records.map(r => r.date);
+  const sizes = trend.combinedSizes || [trend.sizeKey];
+  // For normalized, compute base per size
+  const baseValues = {};
+  sizes.forEach(sk => {
+    const sizeKey = buildSizeKey(sk, 'sell');
+    const vals = records.map(r => r[sizeKey]);
+    if (trend.normalized) {
+      const firstValid = vals.find(v => v != null);
+      baseValues[sk] = firstValid || null;
+    } else {
+      baseValues[sk] = null;
+    }
+  });
+  // Header
+  let csv = 'date';
+  sizes.forEach(sk => {
+    csv += ',' + (trend.normalized ? `${formatTrendSize(sk)}_idx` : formatTrendSize(sk));
+  });
+  csv += '\n';
+  // Rows
+  dates.forEach((d, i) => {
+    csv += d;
+    sizes.forEach(sk => {
+      const sizeKey = buildSizeKey(sk, 'sell');
+      let v = records[i][sizeKey];
+      if (trend.normalized && v != null && baseValues[sk]) {
+        v = (v / baseValues[sk]) * 100;
+      }
+      csv += ',' + (v != null ? (Number.isInteger(v) ? v : v.toFixed(4)) : '');
+    });
+    csv += '\n';
+  });
+  // Download
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const fname = `trend-${sizes.join('-')}-${dates[0]}-to-${dates[dates.length-1]}.csv`;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function resetTrendToDefaults(trend) {
+  trend.startDate = defaultStartDate();
+  trend.endDate = null;
+  trend.normalized = false;
+  if (trend.sizeKey === 'combined') {
+    trend.yRefSize = trend.combinedSizes[0];
+  }
+  // Update header inputs
+  trend.el.querySelector('.trend-date-start').value = formatMMDDYYYY(trend.startDate);
+  trend.el.querySelector('.trend-date-end').value = '';
+  const normCb = trend.el.querySelector('.trend-norm-checkbox');
+  if (normCb) normCb.checked = false;
+  if (trend.sizeKey === 'combined') {
+    const yrefSelect = trend.el.querySelector('.trend-yref-select');
+    if (yrefSelect) {
+      yrefSelect.disabled = false;
+      yrefSelect.value = trend.yRefSize;
+    }
+    rebuildCombinedChart(trend);
+  } else {
+    createTrendChart(trend);
+  }
   saveTrendLayout();
 }
 
