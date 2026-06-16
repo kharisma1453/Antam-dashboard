@@ -1418,7 +1418,7 @@ const SnakeGame = {
   score: 0,
   goldCollected: 0,
   highScore: 0,
-  speed: 150,
+  speed: 200,
   minSpeed: 70,
   tickTimer: null,
   paused: true,
@@ -1479,7 +1479,7 @@ const SnakeGame = {
     this.nextDirection = { x: 1, y: 0 };
     this.score = 0;
     this.goldCollected = 0;
-    this.speed = 150;
+    this.speed = 200;
     this.paused = true;
     this.gameOver = false;
     this.spawnFood();
@@ -1545,9 +1545,9 @@ const SnakeGame = {
     if (this.food && newHead.x === this.food.x && newHead.y === this.food.y) {
       this.score += this.food.value;
       this.goldCollected += this.food.value;
-      // Speed up every 2 food items
-      if (this.score % 2 === 0 && this.speed > this.minSpeed) {
-        this.speed = Math.max(this.minSpeed, this.speed - 5);
+      // Speed up every 30 points (kelipatan 30)
+      if (this.score > 0 && this.score % 30 === 0 && this.speed > this.minSpeed) {
+        this.speed = Math.max(this.minSpeed, this.speed - 8);
         this.clearTick();
         this.tickTimer = setInterval(() => this.tick(), this.speed);
       }
