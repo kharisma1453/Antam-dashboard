@@ -1389,6 +1389,9 @@ function computeROI() {
   // Period
   document.getElementById('roi-period').textContent =
     `⏱️ Holding period: ${formatHoldingPeriod(totalDays)} · dari ${formatDateID(earliest)} (pembelian pertama) sampai ${formatDateID(lastDate)}`;
+
+  // Auto-sync prediction panel with current ROI first row
+  if (typeof updatePrediction === 'function') updatePrediction();
 }
 
 function attachROICalculatorListeners() {
@@ -1821,31 +1824,14 @@ function loadPredictions() {
 }
 
 function initPredictionPanel() {
-  const sizeSelect = document.getElementById('pred-size');
-  if (!sizeSelect || !PRED) return;
+  if (!PRED) return;
 
-  // Populate size dropdown (default to 1g)
-  const sizeKeys = Object.keys(PRED.sizes);
-  sizeKeys.sort((a, b) => parseFloat(a) - parseFloat(b));
-  sizeKeys.forEach((key) => {
-    const sz = PRED.sizes[key];
-    const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = sz.size_label;
-    if (key === '1') opt.selected = true;
-    sizeSelect.appendChild(opt);
-  });
-
-  // Set default dates: today, +3y
+  // Set default sell date: today + 3y
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
   const future = new Date(today);
   future.setFullYear(future.getFullYear() + 3);
   const futureStr = future.toISOString().slice(0, 10);
-
-  document.getElementById('pred-buy-date').value = todayStr;
   document.getElementById('pred-sell-date').value = futureStr;
-  document.getElementById('pred-pieces').value = 10;
 
   // Status badge
   const status = document.getElementById('pred-status');
@@ -1860,14 +1846,12 @@ function initPredictionPanel() {
     modelInfo.textContent = `${PRED.library || 'Prophet/ARIMA'} · ${n.toLocaleString('id-ID')} hari training`;
   }
 
-  // Listeners
-  ['pred-size', 'pred-pieces', 'pred-buy-date', 'pred-sell-date'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('input', updatePrediction);
-      el.addEventListener('change', updatePrediction);
-    }
-  });
+  // Listener on sell date only (size + pieces are auto-synced from ROI)
+  const sellEl = document.getElementById('pred-sell-date');
+  if (sellEl) {
+    sellEl.addEventListener('input', updatePrediction);
+    sellEl.addEventListener('change', updatePrediction);
+  }
 
   updatePrediction();
 }
@@ -1896,13 +1880,18 @@ function findClosestHorizon(sellDate, lastDateStr, horizons) {
 
 function updatePrediction() {
   if (!PRED) return;
-  const sizeKey = document.getElementById('pred-size').value;
-  const pieces = parseInt(document.getElementById('pred-pieces').value, 10);
+
+  // Read size + pieces from first ROI row (auto-sync)
+  const roiRows = getROIRows();
+  const firstRow = roiRows[0];
+  const sizeChip = document.getElementById('pred-size-display');
+  const piecesChip = document.getElementById('pred-pieces-display');
   const sellDate = document.getElementById('pred-sell-date').value;
 
-  const sz = PRED.sizes[sizeKey];
-  if (!sz || !pieces || !sellDate) {
-    // Reset display
+  if (!firstRow || !firstRow.valid || !sellDate) {
+    // No valid ROI input — clear display
+    if (sizeChip) sizeChip.textContent = '—';
+    if (piecesChip) piecesChip.textContent = '—';
     ['pred-bear-value', 'pred-base-value', 'pred-bull-value'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.textContent = '—';
@@ -1913,6 +1902,17 @@ function updatePrediction() {
     });
     return;
   }
+
+  // Map: ROI uses "0.5", predictions JSON uses "0_5"
+  const sizeKey = firstRow.sizeRef === '0.5' ? '0_5' : firstRow.sizeRef;
+  const pieces = firstRow.pieces;
+
+  // Update summary chips
+  if (sizeChip) sizeChip.textContent = firstRow.sizeRef + 'g';
+  if (piecesChip) piecesChip.textContent = pieces + ' keping';
+
+  const sz = PRED.sizes[sizeKey];
+  if (!sz || !pieces) return;
 
   const horizon = findClosestHorizon(sellDate, sz.current_date, sz.predictions);
   if (!horizon) return;
