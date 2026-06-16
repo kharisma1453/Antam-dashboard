@@ -1685,7 +1685,6 @@ body.trends-sync-on .trend-sync-badge {
   font-size: 12px;
   flex-shrink: 0;
 }
-.trend-select-wrap,
 .trend-norm-wrap {
   display: flex;
   align-items: center;
@@ -1697,13 +1696,6 @@ body.trends-sync-on .trend-sync-badge {
   border-radius: 4px;
   margin-left: auto;
 }
-.trend-select-wrap {
-  margin-left: auto;
-}
-.trend-norm-wrap {
-  margin-left: 0;
-}
-.trend-select-wrap input,
 .trend-norm-wrap input {
   cursor: pointer;
   margin: 0;
@@ -1884,10 +1876,7 @@ body.trends-sync-on .trend-sync-badge {
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-/* In combined windows there's no .trend-select-wrap, so push norm to the right */
-.trend-combined .trend-norm-wrap {
-  margin-left: auto;
-}
+/* (No combined-specific rule needed — .trend-norm-wrap defaults to margin-left: auto) */
 
 /* Right-click context menu on trend windows */
 .trend-context-menu {

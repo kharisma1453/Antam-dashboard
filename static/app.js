@@ -2365,15 +2365,7 @@ function populateCombinedLegend(trend) {
 }
 
 function setupTrendActionButtons() {
-  const combineBtn = document.getElementById('trend-combine-btn');
   const resetBtn = document.getElementById('trend-reset-btn');
-  if (combineBtn) {
-    combineBtn.addEventListener('click', () => {
-      const selected = TRENDS.filter(t => t.selected && t.sizeKey !== 'combined');
-      if (selected.length < 2) return;
-      combineTrends(selected);
-    });
-  }
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
       if (TRENDS.length === 0) return;
@@ -2384,7 +2376,6 @@ function setupTrendActionButtons() {
       });
       TRENDS = [];
       showTrendCanvasEmpty();
-      updateTrendCombineButton();
       try { localStorage.removeItem('antam-trends-layout'); } catch (e) {}
     });
   }
@@ -2500,7 +2491,6 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
       <span class="trend-handle" title="Drag to move">⋮⋮</span>
       <span class="trend-title">${formatTrendSize(sizeKey)}</span>
       <span class="trend-sync-badge" title="Date range + normalize di-sync dari window ini ke semua window lain">🔗 synced</span>
-      <label class="trend-select-wrap" title="Tick buat combine"><input type="checkbox" class="trend-select-checkbox"> pick</label>
       <label class="trend-norm-wrap" title="Re-base ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn" title="Close">×</button>
     </div>
@@ -2522,17 +2512,15 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
   el.querySelector('.trend-date-start').value = startDate ? formatMMDDYYYY(startDate) : '';
   el.querySelector('.trend-date-end').value = endDate ? formatMMDDYYYY(endDate) : '';
   el.querySelector('.trend-norm-checkbox').checked = normalized;
-  if (opts.selected) el.querySelector('.trend-select-checkbox').checked = true;
 
   document.getElementById('trends-canvas').appendChild(el);
 
-  const trend = { id, sizeKey, x, y, w, h, startDate, endDate, normalized, yMin: opts.yMin != null ? opts.yMin : null, yMax: opts.yMax != null ? opts.yMax : null, chart: null, el, selected: !!opts.selected };
+  const trend = { id, sizeKey, x, y, w, h, startDate, endDate, normalized, yMin: opts.yMin != null ? opts.yMin : null, yMax: opts.yMax != null ? opts.yMax : null, chart: null, el };
   TRENDS.push(trend);
 
   setupTrendWindowInteractions(trend);
   createTrendChart(trend);
   hideTrendCanvasEmpty();
-  updateTrendCombineButton();
   if (!opts.skipSave) saveTrendLayout();
 }
 
@@ -2597,7 +2585,6 @@ function setupTrendWindowInteractions(trend) {
     el.remove();
     TRENDS = TRENDS.filter(t => t.id !== trend.id);
     showTrendCanvasEmpty();
-    updateTrendCombineButton();
     saveTrendLayout();
   });
 
@@ -2613,12 +2600,6 @@ function setupTrendWindowInteractions(trend) {
     // Propagate normalize to all other windows if "Apply to all" is enabled
     syncOtherTrendWindows(trend, { normalized: trend.normalized });
     saveTrendLayout();
-  });
-
-  // Select checkbox
-  el.querySelector('.trend-select-checkbox').addEventListener('change', e => {
-    trend.selected = e.target.checked;
-    updateTrendCombineButton();
   });
 
   // Right-click context menu
@@ -2719,14 +2700,6 @@ function createTrendChart(trend) {
       },
     },
   });
-}
-
-function updateTrendCombineButton() {
-  const selected = TRENDS.filter(t => t.selected && t.sizeKey !== 'combined');
-  const btn = document.getElementById('trend-combine-btn');
-  if (!btn) return;
-  btn.disabled = selected.length < 2;
-  btn.textContent = `🔗 Combine (${selected.length})`;
 }
 
 // Build the Chart.js config (labels, datasets, scales) for a combined trend window.
@@ -3480,7 +3453,6 @@ function saveTrendLayout() {
     startDate: t.startDate || null,
     endDate: t.endDate || null,
     normalized: t.normalized,
-    selected: !!t.selected,
     yMin: t.yMin != null ? t.yMin : null,
     yMax: t.yMax != null ? t.yMax : null,
   }));
@@ -3505,7 +3477,7 @@ function loadTrendLayout() {
       if (t.sizeKey === 'combined') return;
       if (!valid.includes(t.sizeKey)) return;
       // Handle backward compat: old layout had 'range', new has 'startDate'/'endDate'
-      const opts = { w: t.w, h: t.h, normalized: t.normalized, selected: t.selected, skipSave: true };
+      const opts = { w: t.w, h: t.h, normalized: t.normalized, skipSave: true };
       if (t.startDate !== undefined || t.endDate !== undefined) {
         opts.startDate = t.startDate || null;
         opts.endDate = t.endDate !== undefined ? t.endDate : null;
