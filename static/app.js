@@ -2052,6 +2052,45 @@ const RANGE_DAYS = {
   '1m': 30, '3m': 90, '6m': 180, '1y': 365, '3y': 1095, '5y': 1825, 'all': null,
 };
 
+// ----- Date helpers (mm/dd/yyyy format) -----
+function formatMMDDYYYY(yyyymmdd) {
+  if (!yyyymmdd) return '';
+  const parts = yyyymmdd.split('-');
+  if (parts.length !== 3) return '';
+  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+}
+
+function parseMMDDYYYY(str) {
+  if (!str) return null;
+  const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const month = parseInt(m[1], 10);
+  const day = parseInt(m[2], 10);
+  const year = parseInt(m[3], 10);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  // Sanity: month/day ranges
+  const daysInMonth = new Date(year, month, 0).getDate();
+  if (day > daysInMonth) return null;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function defaultStartDate() {
+  // 1 month before the last data date
+  if (!rawDates || rawDates.length === 0) return null;
+  const lastDate = new Date(rawDates[rawDates.length - 1] + 'T00:00:00');
+  lastDate.setMonth(lastDate.getMonth() - 1);
+  return lastDate.toISOString().slice(0, 10);
+}
+
+function convertOldRangeToDateRange(oldRange) {
+  if (!oldRange || oldRange === 'all') return { startDate: null, endDate: null };
+  const days = RANGE_DAYS[oldRange];
+  if (!days || !rawDates || rawDates.length === 0) return { startDate: null, endDate: null };
+  const last = new Date(rawDates[rawDates.length - 1] + 'T00:00:00');
+  last.setDate(last.getDate() - days + 1);
+  return { startDate: last.toISOString().slice(0, 10), endDate: null };
+}
+
 function formatTrendSize(sizeKey) {
   const s = String(sizeKey).replace('_', '.');
   if (s === '1000') return '1kg';
@@ -2164,12 +2203,13 @@ function addSizeToTrend(targetTrend, newSizeKey) {
 
   sizes.push(newSizeKey);
 
-  // Save geometry + range so the new combined window keeps the same position
+  // Save geometry + date range so the new combined window keeps the same position
   const x = targetTrend.x;
   const y = targetTrend.y;
   const w = targetTrend.w;
   const h = targetTrend.h;
-  const range = targetTrend.range;
+  const startDate = targetTrend.startDate || null;
+  const endDate = targetTrend.endDate || null;
 
   // Tear down old
   if (targetTrend.chart) targetTrend.chart.destroy();
@@ -2177,8 +2217,8 @@ function addSizeToTrend(targetTrend, newSizeKey) {
   TRENDS = TRENDS.filter(t => t.id !== targetTrend.id);
 
   // Spawn a new combined trend at the same spot
-  const fakeTrends = sizes.map(sk => ({ sizeKey: sk, range, normalized: false }));
-  combineTrends(fakeTrends, { x, y, w, h });
+  const fakeTrends = sizes.map(sk => ({ sizeKey: sk, normalized: false }));
+  combineTrends(fakeTrends, { x, y, w, h, startDate, endDate });
 }
 
 function removeSizeFromTrend(trend, sizeKeyToRemove) {
@@ -2186,8 +2226,10 @@ function removeSizeFromTrend(trend, sizeKeyToRemove) {
   const sizes = trend.combinedSizes.filter(s => s !== sizeKeyToRemove);
   if (sizes.length === 0) return; // safety
 
-  // Save geometry
-  const x = trend.x, y = trend.y, w = trend.w, h = trend.h, range = trend.range;
+  // Save geometry + date range
+  const x = trend.x, y = trend.y, w = trend.w, h = trend.h;
+  const startDate = trend.startDate || null;
+  const endDate = trend.endDate || null;
 
   // Tear down
   if (trend.chart) trend.chart.destroy();
@@ -2196,11 +2238,11 @@ function removeSizeFromTrend(trend, sizeKeyToRemove) {
 
   if (sizes.length === 1) {
     // Convert to single trend at same position
-    addTrendWindow(sizes[0], x, y, { w, h, range, normalized: false });
+    addTrendWindow(sizes[0], x, y, { w, h, startDate, endDate, normalized: false });
   } else {
     // Re-spawn combined with remaining sizes
-    const fakeTrends = sizes.map(sk => ({ sizeKey: sk, range, normalized: false }));
-    combineTrends(fakeTrends, { x, y, w, h });
+    const fakeTrends = sizes.map(sk => ({ sizeKey: sk, normalized: false }));
+    combineTrends(fakeTrends, { x, y, w, h, startDate, endDate });
   }
 }
 
@@ -2257,7 +2299,19 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
   const id = `trend-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const w = opts.w || 480;
   const h = opts.h || 320;
-  const range = opts.range || '1y';
+  // Date range: prefer explicit opts, else convert from old 'range', else default (1mo back to *)
+  let startDate, endDate;
+  if (opts.startDate !== undefined || opts.endDate !== undefined) {
+    startDate = opts.startDate || null;
+    endDate = opts.endDate !== undefined ? opts.endDate : null;
+  } else if (opts.range) {
+    const conv = convertOldRangeToDateRange(opts.range);
+    startDate = conv.startDate;
+    endDate = conv.endDate;
+  } else {
+    startDate = defaultStartDate();
+    endDate = null;
+  }
   const normalized = !!opts.normalized;
   const color = getTrendColor(sizeKey);
 
@@ -2276,15 +2330,11 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
       <span class="trend-handle" title="Drag to move">⋮⋮</span>
       <span class="trend-title">${formatTrendSize(sizeKey)}</span>
       <label class="trend-select-wrap" title="Tick buat combine"><input type="checkbox" class="trend-select-checkbox"> pick</label>
-      <select class="trend-range-select" title="Date range">
-        <option value="1m">1M</option>
-        <option value="3m">3M</option>
-        <option value="6m">6M</option>
-        <option value="1y">1Y</option>
-        <option value="3y">3Y</option>
-        <option value="5y">5Y</option>
-        <option value="all">All</option>
-      </select>
+      <span class="trend-date-range">
+        <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
+        <span class="trend-date-sep">→</span>
+        <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
+      </span>
       <label class="trend-norm-wrap" title="Re-base ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn" title="Close">×</button>
     </div>
@@ -2296,13 +2346,15 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
     </div>
     <div class="trend-resize-handle" title="Drag to resize">⇲</div>
   `;
-  el.querySelector('.trend-range-select').value = range;
+  // Set initial input values from startDate/endDate
+  el.querySelector('.trend-date-start').value = startDate ? formatMMDDYYYY(startDate) : '';
+  el.querySelector('.trend-date-end').value = endDate ? formatMMDDYYYY(endDate) : '';
   el.querySelector('.trend-norm-checkbox').checked = normalized;
   if (opts.selected) el.querySelector('.trend-select-checkbox').checked = true;
 
   document.getElementById('trends-canvas').appendChild(el);
 
-  const trend = { id, sizeKey, x, y, w, h, range, normalized, chart: null, el, selected: !!opts.selected };
+  const trend = { id, sizeKey, x, y, w, h, startDate, endDate, normalized, chart: null, el, selected: !!opts.selected };
   TRENDS.push(trend);
 
   setupTrendWindowInteractions(trend);
@@ -2377,11 +2429,50 @@ function setupTrendWindowInteractions(trend) {
     saveTrendLayout();
   });
 
-  // Range change
-  el.querySelector('.trend-range-select').addEventListener('change', e => {
-    trend.range = e.target.value;
+  // Start/end date inputs
+  const startInput = el.querySelector('.trend-date-start');
+  const endInput = el.querySelector('.trend-date-end');
+  function handleDateChange() {
+    const startStr = startInput.value.trim();
+    const endStr = endInput.value.trim();
+    const newStart = startStr ? parseMMDDYYYY(startStr) : null;
+    const newEnd = endStr ? parseMMDDYYYY(endStr) : null;
+    if (startStr && !newStart) {
+      startInput.classList.add('invalid');
+    } else {
+      startInput.classList.remove('invalid');
+    }
+    if (endStr && !newEnd) {
+      endInput.classList.add('invalid');
+    } else {
+      endInput.classList.remove('invalid');
+    }
+    if ((startStr && !newStart) || (endStr && !newEnd)) return; // don't redraw on invalid
+    trend.startDate = newStart;
+    trend.endDate = newEnd;
     createTrendChart(trend);
     saveTrendLayout();
+  }
+  // Auto-insert slashes as user types
+  function autoFormatDateInput(input) {
+    input.addEventListener('input', () => {
+      let v = input.value.replace(/[^\d]/g, '');
+      if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+      if (v.length >= 6) v = v.slice(0, 5) + '/' + v.slice(5, 9);
+      if (v.length > 10) v = v.slice(0, 10);
+      input.value = v;
+    });
+  }
+  autoFormatDateInput(startInput);
+  autoFormatDateInput(endInput);
+  startInput.addEventListener('change', handleDateChange);
+  endInput.addEventListener('change', handleDateChange);
+  // Re-format on blur to canonical mm/dd/yyyy
+  startInput.addEventListener('blur', () => {
+    if (trend.startDate) startInput.value = formatMMDDYYYY(trend.startDate);
+  });
+  endInput.addEventListener('blur', () => {
+    if (trend.endDate) endInput.value = formatMMDDYYYY(trend.endDate);
   });
 
   // Normalize toggle
@@ -2398,23 +2489,20 @@ function setupTrendWindowInteractions(trend) {
   });
 }
 
-function getRecordsForTrendRange(range) {
+function getRecordsForTrendDateRange(startDate, endDate) {
   if (!rawDates || !rawColumns || rawDates.length === 0) return [];
-  if (range === 'all' || !RANGE_DAYS[range]) {
-    const records = [];
-    for (let i = 0; i < rawDates.length; i++) {
-      const rec = { date: rawDates[i] };
-      for (const k in rawColumns) rec[k] = rawColumns[k][i];
-      records.push(rec);
-    }
-    return records;
+  let startIdx = 0;
+  let endIdx = rawDates.length;
+  if (startDate) {
+    const i = rawDates.findIndex(d => d >= startDate);
+    startIdx = i === -1 ? rawDates.length : i;
   }
-  const days = RANGE_DAYS[range];
-  const endDate = rawDates[rawDates.length - 1];
-  // Find start index by walking back `days` trading days
-  const startIdx = Math.max(0, rawDates.length - days);
+  if (endDate) {
+    const i = rawDates.findIndex(d => d > endDate);
+    endIdx = i === -1 ? rawDates.length : i;
+  }
   const records = [];
-  for (let i = startIdx; i < rawDates.length; i++) {
+  for (let i = startIdx; i < endIdx; i++) {
     const rec = { date: rawDates[i] };
     for (const k in rawColumns) rec[k] = rawColumns[k][i];
     records.push(rec);
@@ -2427,7 +2515,7 @@ function createTrendChart(trend) {
     trend.chart.destroy();
     trend.chart = null;
   }
-  const records = getRecordsForTrendRange(trend.range);
+  const records = getRecordsForTrendDateRange(trend.startDate, trend.endDate);
   if (!records.length) return;
   const sizeKey = buildSizeKey(trend.sizeKey, 'sell');
   const rawValues = records.map(r => r[sizeKey]).filter(v => v != null);
@@ -2504,9 +2592,10 @@ function updateTrendCombineButton() {
 
 function combineTrends(trends, opts = {}) {
   if (trends.length < 2) return;
-  // Use the most common range (just take first for now)
-  const range = trends[0].range;
-  const records = getRecordsForTrendRange(range);
+  // Use the first trend's date range (could be expanded to intersection later)
+  const startDate = opts.startDate !== undefined ? opts.startDate : (trends[0].startDate || null);
+  const endDate = opts.endDate !== undefined ? opts.endDate : (trends[0].endDate || null);
+  const records = getRecordsForTrendDateRange(startDate, endDate);
   if (!records.length) return;
   const dates = records.map(r => r.date);
   const allNormalized = trends.every(t => t.normalized);
@@ -2610,7 +2699,7 @@ function combineTrends(trends, opts = {}) {
     },
   });
 
-  const trend = { id, sizeKey: 'combined', combinedSizes: trends.map(t => t.sizeKey), x, y, w, h, range, normalized: allNormalized, chart, el, selected: false };
+  const trend = { id, sizeKey: 'combined', combinedSizes: trends.map(t => t.sizeKey), x, y, w, h, startDate, endDate, normalized: allNormalized, chart, el, selected: false };
   TRENDS.push(trend);
 
   // Populate custom legend strip with × buttons per size
@@ -2685,7 +2774,8 @@ function saveTrendLayout() {
     id: t.id,
     sizeKey: t.sizeKey,
     x: Math.round(t.x), y: Math.round(t.y), w: Math.round(t.w), h: Math.round(t.h),
-    range: t.range,
+    startDate: t.startDate || null,
+    endDate: t.endDate || null,
     normalized: t.normalized,
     selected: !!t.selected,
   }));
@@ -2709,9 +2799,15 @@ function loadTrendLayout() {
       // Skip combined windows (can't reconstruct without re-running combine)
       if (t.sizeKey === 'combined') return;
       if (!valid.includes(t.sizeKey)) return;
-      addTrendWindow(t.sizeKey, t.x, t.y, {
-        w: t.w, h: t.h, range: t.range, normalized: t.normalized, selected: t.selected, skipSave: true,
-      });
+      // Handle backward compat: old layout had 'range', new has 'startDate'/'endDate'
+      const opts = { w: t.w, h: t.h, normalized: t.normalized, selected: t.selected, skipSave: true };
+      if (t.startDate !== undefined || t.endDate !== undefined) {
+        opts.startDate = t.startDate || null;
+        opts.endDate = t.endDate !== undefined ? t.endDate : null;
+      } else if (t.range) {
+        opts.range = t.range; // addTrendWindow will convert via convertOldRangeToDateRange
+      }
+      addTrendWindow(t.sizeKey, t.x, t.y, opts);
     });
   } catch (e) {
     console.warn('Failed to load trend layout', e);

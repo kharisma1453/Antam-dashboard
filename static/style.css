@@ -1668,6 +1668,41 @@ input[type="number"] {
   outline: none;
   border-color: var(--size-color, var(--gold));
 }
+.trend-date-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
+}
+.trend-date-input {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  width: 78px;
+  cursor: text;
+  text-align: center;
+}
+.trend-date-input:focus {
+  outline: none;
+  border-color: var(--size-color, var(--gold));
+}
+.trend-date-input.invalid {
+  border-color: var(--red);
+  color: var(--red);
+}
+.trend-date-input::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.trend-date-sep {
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 0 1px;
+}
 .trend-close-btn {
   background: transparent;
   border: none;
