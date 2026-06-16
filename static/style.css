@@ -1824,6 +1824,39 @@ input[type="number"] {
 .trend-combined .trend-date-range {
   margin-left: auto;
 }
+.trend-yref-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 2px 4px;
+  border-radius: 4px;
+  margin-left: 0;
+}
+.trend-yref-label {
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 10px;
+}
+.trend-yref-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 10px;
+  cursor: pointer;
+  max-width: 70px;
+}
+.trend-yref-select:focus {
+  outline: none;
+  border-color: var(--size-color, var(--gold));
+}
+.trend-yref-select:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 /* Mobile: stack library on top of canvas */
 @media (max-width: 720px) {

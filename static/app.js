@@ -2251,6 +2251,8 @@ function addSizeToTrend(targetTrend, newSizeKey) {
   const h = targetTrend.h;
   const startDate = targetTrend.startDate || null;
   const endDate = targetTrend.endDate || null;
+  // Preserve y-ref if exists (combined only)
+  const yRefSize = targetTrend.yRefSize || sizes[0];
 
   // Tear down old
   if (targetTrend.chart) targetTrend.chart.destroy();
@@ -2259,7 +2261,7 @@ function addSizeToTrend(targetTrend, newSizeKey) {
 
   // Spawn a new combined trend at the same spot
   const fakeTrends = sizes.map(sk => ({ sizeKey: sk, normalized: false }));
-  combineTrends(fakeTrends, { x, y, w, h, startDate, endDate });
+  combineTrends(fakeTrends, { x, y, w, h, startDate, endDate, yRefSize });
 }
 
 function removeSizeFromTrend(trend, sizeKeyToRemove) {
@@ -2271,6 +2273,8 @@ function removeSizeFromTrend(trend, sizeKeyToRemove) {
   const x = trend.x, y = trend.y, w = trend.w, h = trend.h;
   const startDate = trend.startDate || null;
   const endDate = trend.endDate || null;
+  // Pick a new y-ref if current one is being removed
+  const yRefSize = trend.yRefSize === sizeKeyToRemove ? sizes[0] : trend.yRefSize;
 
   // Tear down
   if (trend.chart) trend.chart.destroy();
@@ -2278,12 +2282,12 @@ function removeSizeFromTrend(trend, sizeKeyToRemove) {
   TRENDS = TRENDS.filter(t => t.id !== trend.id);
 
   if (sizes.length === 1) {
-    // Convert to single trend at same position
+    // Convert to single trend at same position (no y-ref needed)
     addTrendWindow(sizes[0], x, y, { w, h, startDate, endDate, normalized: false });
   } else {
     // Re-spawn combined with remaining sizes
     const fakeTrends = sizes.map(sk => ({ sizeKey: sk, normalized: false }));
-    combineTrends(fakeTrends, { x, y, w, h, startDate, endDate });
+    combineTrends(fakeTrends, { x, y, w, h, startDate, endDate, yRefSize });
   }
 }
 
@@ -2591,64 +2595,86 @@ function updateTrendCombineButton() {
 }
 
 // Build the Chart.js config (labels, datasets, scales) for a combined trend window.
+// All sizes share a single y-axis. yRefSize controls the y-axis range + label.
 // Returns null if no records in range.
-function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized) {
+function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized, yRefSize) {
   const records = getRecordsForTrendDateRange(startDate, endDate);
   if (!records.length) return null;
   const dates = records.map(r => r.date);
 
-  const datasets = combinedSizes.map((sk, i) => {
+  // Compute data per size
+  const sizeData = {};
+  combinedSizes.forEach(sk => {
     const sizeKey = buildSizeKey(sk, 'sell');
     let data = records.map(r => r[sizeKey]);
-    if (normalized && data[0]) {
-      const base = data[0];
-      data = data.map(v => v != null ? (v / base) * 100 : null);
+    if (normalized && data.length) {
+      const firstValid = data.find(v => v != null);
+      if (firstValid) {
+        data = data.map(v => v != null ? (v / firstValid) * 100 : null);
+      }
     }
+    sizeData[sk] = data;
+  });
+
+  // Y-axis range: from yRefSize's data (or fixed 50-200 for normalized)
+  let yMin, yMax, yLabel;
+  if (normalized) {
+    yMin = 50; yMax = 200;
+    yLabel = 'Index (100 = start)';
+  } else {
+    const refData = sizeData[yRefSize] || [];
+    const valid = refData.filter(v => v != null);
+    if (valid.length) {
+      yMin = Math.min(...valid);
+      yMax = Math.max(...valid);
+      const pad = (yMax - yMin) * 0.05 || 1;
+      yMin -= pad; yMax += pad;
+    } else {
+      yMin = 0; yMax = 1;
+    }
+    yLabel = `Harga (${formatTrendSize(yRefSize)})`;
+  }
+
+  const refColor = getTrendColor(yRefSize);
+  const datasets = combinedSizes.map(sk => {
     const color = getTrendColor(sk);
     return {
       label: formatTrendSize(sk),
-      data: data,
+      data: sizeData[sk],
       borderColor: color,
       backgroundColor: color + '15',
       borderWidth: 1.5,
       pointRadius: 0,
       pointHoverRadius: 3,
       tension: 0.1,
-      yAxisID: normalized ? 'y' : `y${i}`,
+      yAxisID: 'y',
       fill: false,
     };
   });
 
   const scales = {
     x: { type: 'time', time: { unit: 'month' }, ticks: { maxTicksLimit: 6, font: { size: 9 } }, grid: { display: false } },
-  };
-  if (normalized) {
-    scales.y = {
+    y: {
       type: 'linear',
       position: 'left',
-      title: { display: true, text: 'Index (100 = start)', font: { size: 9 }, color: '#9aa0a6' },
-      ticks: { maxTicksLimit: 5, font: { size: 9 } },
+      min: yMin,
+      max: yMax,
+      title: { display: true, text: yLabel, font: { size: 9 }, color: refColor },
+      ticks: {
+        maxTicksLimit: 5,
+        font: { size: 9 },
+        callback: v => normalized ? v.toFixed(0) : 'Rp ' + (v / 1000).toFixed(0) + 'k',
+      },
       grid: { color: 'rgba(255,255,255,0.05)' },
-    };
-  } else {
-    combinedSizes.forEach((sk, i) => {
-      const color = getTrendColor(sk);
-      scales[`y${i}`] = {
-        type: 'linear',
-        position: i === 0 ? 'left' : 'right',
-        title: { display: true, text: formatTrendSize(sk), font: { size: 9 }, color: color },
-        ticks: { maxTicksLimit: 4, font: { size: 8 }, callback: v => 'Rp ' + (v / 1000).toFixed(0) + 'k' },
-        grid: { drawOnChartArea: i === 0, color: 'rgba(255,255,255,0.05)' },
-      };
-    });
-  }
+    },
+  };
 
   return { labels: dates, datasets, scales };
 }
 
-// Re-render a combined trend's chart (after date or normalize change)
+// Re-render a combined trend's chart (after date, normalize, or y-ref change)
 function rebuildCombinedChart(trend) {
-  const config = buildCombinedChartConfig(trend.startDate, trend.endDate, trend.combinedSizes, trend.normalized);
+  const config = buildCombinedChartConfig(trend.startDate, trend.endDate, trend.combinedSizes, trend.normalized, trend.yRefSize);
   if (!config) {
     if (trend.chart) { trend.chart.destroy(); trend.chart = null; }
     return;
@@ -2679,10 +2705,11 @@ function rebuildCombinedChart(trend) {
       scales: config.scales,
     },
   });
-  // Update title to reflect normalize mode
+  // Update title to reflect normalize + y-ref
   const titleEl = trend.el.querySelector('.trend-title');
   if (titleEl) {
-    titleEl.textContent = `🔗 Combined (${trend.combinedSizes.length} sizes · ${trend.normalized ? 'normalized' : 'multi-axis'})`;
+    const mode = trend.normalized ? 'normalized' : `y-ref: ${formatTrendSize(trend.yRefSize)}`;
+    titleEl.textContent = `🔗 Combined (${trend.combinedSizes.length} sizes · ${mode})`;
   }
 }
 
@@ -2693,9 +2720,11 @@ function combineTrends(trends, opts = {}) {
   const endDate = opts.endDate !== undefined ? opts.endDate : (trends[0].endDate || null);
   const allNormalized = trends.every(t => t.normalized);
   const combinedSizes = trends.map(t => t.sizeKey);
+  // y-ref: from opts (e.g. preserve when re-spawning after remove), else default to first size
+  const yRefSize = (opts.yRefSize && combinedSizes.includes(opts.yRefSize)) ? opts.yRefSize : combinedSizes[0];
 
   // Validate that we have data
-  const testConfig = buildCombinedChartConfig(startDate, endDate, combinedSizes, allNormalized);
+  const testConfig = buildCombinedChartConfig(startDate, endDate, combinedSizes, allNormalized, yRefSize);
   if (!testConfig) return;
 
   const id = `trend-combined-${Date.now()}`;
@@ -2712,12 +2741,18 @@ function combineTrends(trends, opts = {}) {
   el.innerHTML = `
     <div class="trend-window-header">
       <span class="trend-handle">⋮⋮</span>
-      <span class="trend-title">🔗 Combined (${combinedSizes.length} sizes · ${allNormalized ? 'normalized' : 'multi-axis'})</span>
+      <span class="trend-title">🔗 Combined (${combinedSizes.length} sizes · y-ref: ${formatTrendSize(yRefSize)})</span>
       <span class="trend-date-range">
         <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
         <span class="trend-date-sep">→</span>
         <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
       </span>
+      <label class="trend-yref-wrap" title="Pilih size yang jadi referensi y-axis range">
+        <span class="trend-yref-label">Y:</span>
+        <select class="trend-yref-select">
+          ${combinedSizes.map(sk => `<option value="${sk}"${sk === yRefSize ? ' selected' : ''}>${formatTrendSize(sk)}</option>`).join('')}
+        </select>
+      </label>
       <label class="trend-norm-wrap" title="Re-base semua size ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn">×</button>
     </div>
@@ -2733,10 +2768,12 @@ function combineTrends(trends, opts = {}) {
   el.querySelector('.trend-date-start').value = startDate ? formatMMDDYYYY(startDate) : '';
   el.querySelector('.trend-date-end').value = endDate ? formatMMDDYYYY(endDate) : '';
   el.querySelector('.trend-norm-checkbox').checked = allNormalized;
+  const yrefSelect = el.querySelector('.trend-yref-select');
+  yrefSelect.disabled = allNormalized; // disabled when normalized on
 
   document.getElementById('trends-canvas').appendChild(el);
 
-  const trend = { id, sizeKey: 'combined', combinedSizes, x, y, w, h, startDate, endDate, normalized: allNormalized, chart: null, el, selected: false };
+  const trend = { id, sizeKey: 'combined', combinedSizes, x, y, w, h, startDate, endDate, normalized: allNormalized, yRefSize, chart: null, el, selected: false };
   TRENDS.push(trend);
 
   // Build chart via helper
@@ -2750,9 +2787,17 @@ function combineTrends(trends, opts = {}) {
   const endInput = el.querySelector('.trend-date-end');
   setupTrendDateInputs(trend, startInput, endInput, () => rebuildCombinedChart(trend));
 
-  // Wire normalize toggle
+  // Wire y-ref selector
+  yrefSelect.addEventListener('change', e => {
+    trend.yRefSize = e.target.value;
+    rebuildCombinedChart(trend);
+    saveTrendLayout();
+  });
+
+  // Wire normalize toggle (also enables/disables y-ref selector)
   el.querySelector('.trend-norm-checkbox').addEventListener('change', e => {
     trend.normalized = e.target.checked;
+    yrefSelect.disabled = trend.normalized;
     rebuildCombinedChart(trend);
     saveTrendLayout();
   });
