@@ -2032,6 +2032,7 @@ function updatePrediction() {
 // ====== Trend Builder (Drag & Drop, PI Vision style) ======
 let TRENDS = [];
 let trendZIndex = 100;
+let TREND_SYNC_ALL = false;
 
 const TREND_COLORS = {
   '0_5': '#a78bfa',
@@ -2118,6 +2119,8 @@ function setupTrendDateInputs(trend, startInput, endInput, onChange) {
     trend.startDate = newStart;
     trend.endDate = newEnd;
     onChange();
+    // Propagate date range to all other windows if "Apply to all" is enabled
+    syncOtherTrendWindows(trend, { startDate: newStart, endDate: newEnd });
     saveTrendLayout();
   }
   autoFormatDateInput(startInput);
@@ -2200,6 +2203,7 @@ function initTrendBuilder() {
   setupTrendCatalog();
   setupTrendCanvas();
   setupTrendActionButtons();
+  setupTrendSyncToggle();
   // Loading layout from storage happens after data loads (see loadData)
 }
 
@@ -2386,6 +2390,81 @@ function setupTrendActionButtons() {
   }
 }
 
+// Wire the "Apply to all" sync toggle. When ON, changes to date range / normalize
+// in any window propagate to every other window. State persists in localStorage.
+function setupTrendSyncToggle() {
+  const cb = document.getElementById('trend-sync-all');
+  if (!cb) return;
+  // Restore from localStorage
+  try {
+    const saved = localStorage.getItem('antam-trends-sync-all');
+    TREND_SYNC_ALL = saved === '1';
+    cb.checked = TREND_SYNC_ALL;
+  } catch (e) { /* ignore */ }
+  if (TREND_SYNC_ALL) document.body.classList.add('trends-sync-on');
+
+  cb.addEventListener('change', () => {
+    TREND_SYNC_ALL = cb.checked;
+    if (TREND_SYNC_ALL) document.body.classList.add('trends-sync-on');
+    else document.body.classList.remove('trends-sync-on');
+    try {
+      localStorage.setItem('antam-trends-sync-all', TREND_SYNC_ALL ? '1' : '0');
+    } catch (e) { /* ignore */ }
+  });
+}
+
+// Flash a trend window with a blue ring to show it just got updated by sync.
+function flashTrendSync(el) {
+  if (!el) return;
+  el.classList.remove('trend-sync-flash');
+  // Force reflow so re-adding the class restarts the animation
+  void el.offsetWidth;
+  el.classList.add('trend-sync-flash');
+  setTimeout(() => el.classList.remove('trend-sync-flash'), 700);
+}
+
+// Apply source trend's synced fields to every OTHER trend window.
+// Used when "Apply to all" is enabled and the user changes something in the source.
+// `fields` can include: startDate, endDate, normalized
+function syncOtherTrendWindows(sourceTrend, fields) {
+  if (!TREND_SYNC_ALL) return;
+  let anyChange = false;
+  TRENDS.forEach(t => {
+    if (t.id === sourceTrend.id) return;
+    let needsRebuild = false;
+
+    if ('startDate' in fields) {
+      t.startDate = fields.startDate || null;
+      const inp = t.el.querySelector('.trend-date-start');
+      if (inp) inp.value = t.startDate ? formatMMDDYYYY(t.startDate) : '';
+      needsRebuild = true;
+    }
+    if ('endDate' in fields) {
+      t.endDate = fields.endDate || null;
+      const inp = t.el.querySelector('.trend-date-end');
+      if (inp) inp.value = t.endDate ? formatMMDDYYYY(t.endDate) : '';
+      needsRebuild = true;
+    }
+    if ('normalized' in fields) {
+      t.normalized = !!fields.normalized;
+      const cb = t.el.querySelector('.trend-norm-checkbox');
+      if (cb) cb.checked = t.normalized;
+      needsRebuild = true;
+    }
+
+    if (needsRebuild) {
+      if (t.combinedSizes) {
+        rebuildCombinedChart(t);
+      } else {
+        createTrendChart(t);
+      }
+      flashTrendSync(t.el);
+      anyChange = true;
+    }
+  });
+  if (anyChange) saveTrendLayout();
+}
+
 function addTrendWindow(sizeKey, x, y, opts = {}) {
   const id = `trend-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   const w = opts.w || 480;
@@ -2420,6 +2499,7 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
     <div class="trend-window-header">
       <span class="trend-handle" title="Drag to move">⋮⋮</span>
       <span class="trend-title">${formatTrendSize(sizeKey)}</span>
+      <span class="trend-sync-badge" title="Date range + normalize di-sync dari window ini ke semua window lain">🔗 synced</span>
       <label class="trend-select-wrap" title="Tick buat combine"><input type="checkbox" class="trend-select-checkbox"> pick</label>
       <label class="trend-norm-wrap" title="Re-base ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn" title="Close">×</button>
@@ -2530,6 +2610,8 @@ function setupTrendWindowInteractions(trend) {
   el.querySelector('.trend-norm-checkbox').addEventListener('change', e => {
     trend.normalized = e.target.checked;
     createTrendChart(trend);
+    // Propagate normalize to all other windows if "Apply to all" is enabled
+    syncOtherTrendWindows(trend, { normalized: trend.normalized });
     saveTrendLayout();
   });
 
@@ -2804,6 +2886,7 @@ function combineTrends(trends, opts = {}) {
     <div class="trend-window-header">
       <span class="trend-handle">⋮⋮</span>
       <span class="trend-title">🔗 Combined (${combinedSizes.length} sizes${allNormalized ? ' · normalized' : ''})</span>
+      <span class="trend-sync-badge" title="Date range + normalize di-sync dari window ini ke semua window lain">🔗 synced</span>
       <label class="trend-norm-wrap" title="Re-base semua size ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn">×</button>
     </div>
@@ -2847,6 +2930,8 @@ function combineTrends(trends, opts = {}) {
   el.querySelector('.trend-norm-checkbox').addEventListener('change', e => {
     trend.normalized = e.target.checked;
     rebuildCombinedChart(trend);
+    // Propagate normalize to all other windows if "Apply to all" is enabled
+    syncOtherTrendWindows(trend, { normalized: trend.normalized });
     saveTrendLayout();
   });
 

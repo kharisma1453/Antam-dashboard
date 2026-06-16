@@ -1445,6 +1445,60 @@ input[type="number"] {
   gap: 8px;
   align-items: center;
 }
+.trend-sync-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+  margin-left: auto;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.trend-sync-toggle:hover {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+.trend-sync-toggle input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+.trend-sync-toggle:has(input:checked) {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+}
+.trend-sync-badge {
+  display: none;
+  font-size: 9px;
+  padding: 2px 7px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  margin-left: 8px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  align-items: center;
+  gap: 3px;
+}
+body.trends-sync-on .trend-sync-badge {
+  display: inline-flex;
+}
+@keyframes trendSyncFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+  20%  { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+.trend-window.trend-sync-flash {
+  animation: trendSyncFlash 0.7s ease-out;
+}
 .trend-btn {
   background: linear-gradient(135deg, var(--gold-dark), var(--gold));
   color: #0a0e1a;
