@@ -2616,19 +2616,27 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
     sizeData[sk] = data;
   });
 
-  // Y-axis range: from yRefSize's data (or fixed 50-200 for normalized)
+  // Y-axis range: union of ALL sizes' data so every line is visible.
+  // yRefSize only controls the axis label + color (not the range).
   let yMin, yMax, yLabel;
   if (normalized) {
     yMin = 50; yMax = 200;
     yLabel = 'Index (100 = start)';
   } else {
-    const refData = sizeData[yRefSize] || [];
-    const valid = refData.filter(v => v != null);
-    if (valid.length) {
-      yMin = Math.min(...valid);
-      yMax = Math.max(...valid);
-      const pad = (yMax - yMin) * 0.05 || 1;
-      yMin -= pad; yMax += pad;
+    // Find global min/max across every size's data
+    let globalMin = Infinity, globalMax = -Infinity;
+    combinedSizes.forEach(sk => {
+      const valid = (sizeData[sk] || []).filter(v => v != null);
+      if (!valid.length) return;
+      const lo = Math.min(...valid);
+      const hi = Math.max(...valid);
+      if (lo < globalMin) globalMin = lo;
+      if (hi > globalMax) globalMax = hi;
+    });
+    if (isFinite(globalMin) && isFinite(globalMax)) {
+      const pad = (globalMax - globalMin) * 0.05 || 1;
+      yMin = globalMin - pad;
+      yMax = globalMax + pad;
     } else {
       yMin = 0; yMax = 1;
     }
@@ -2708,7 +2716,7 @@ function rebuildCombinedChart(trend) {
   // Update title to reflect normalize + y-ref
   const titleEl = trend.el.querySelector('.trend-title');
   if (titleEl) {
-    const mode = trend.normalized ? 'normalized' : `y-ref: ${formatTrendSize(trend.yRefSize)}`;
+    const mode = trend.normalized ? 'normalized' : `axis: ${formatTrendSize(trend.yRefSize)}`;
     titleEl.textContent = `🔗 Combined (${trend.combinedSizes.length} sizes · ${mode})`;
   }
 }
@@ -2741,13 +2749,13 @@ function combineTrends(trends, opts = {}) {
   el.innerHTML = `
     <div class="trend-window-header">
       <span class="trend-handle">⋮⋮</span>
-      <span class="trend-title">🔗 Combined (${combinedSizes.length} sizes · y-ref: ${formatTrendSize(yRefSize)})</span>
+      <span class="trend-title">🔗 Combined (${combinedSizes.length} sizes · axis: ${formatTrendSize(yRefSize)})</span>
       <span class="trend-date-range">
         <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
         <span class="trend-date-sep">→</span>
         <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
       </span>
-      <label class="trend-yref-wrap" title="Pilih size yang jadi referensi y-axis range">
+      <label class="trend-yref-wrap" title="Label y-axis (range selalu cover semua data biar semua size keliatan)">
         <span class="trend-yref-label">Y:</span>
         <select class="trend-yref-select">
           ${combinedSizes.map(sk => `<option value="${sk}"${sk === yRefSize ? ' selected' : ''}>${formatTrendSize(sk)}</option>`).join('')}
