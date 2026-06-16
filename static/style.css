@@ -1437,8 +1437,7 @@ input[type="number"] {
 }
 
 /* ====== Snake Xenzia Game ====== */
-.roi-section + .pred-section,
-.pred-section + .game-section {
+.roi-section + .game-section {
   margin-top: 24px;
 }
 .game-section {
