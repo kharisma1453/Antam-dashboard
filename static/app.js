@@ -1408,7 +1408,8 @@ function attachROICalculatorListeners() {
 const SnakeGame = {
   canvas: null,
   ctx: null,
-  gridSize: 20,
+  gridCols: 20,
+  gridRows: 50,
   cellSize: 20,
   snake: [],
   direction: { x: 1, y: 0 },
@@ -1442,7 +1443,7 @@ const SnakeGame = {
     this.canvas = document.getElementById('game-canvas');
     if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
-    this.cellSize = this.canvas.width / this.gridSize;
+    this.cellSize = this.canvas.width / this.gridCols;
     this.highScore = parseInt(localStorage.getItem('snakeHighScore') || '0', 10);
     document.getElementById('game-highscore').textContent = this.highScore;
 
@@ -1473,7 +1474,7 @@ const SnakeGame = {
   },
 
   reset() {
-    this.snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    this.snake = [{ x: 10, y: 25 }, { x: 9, y: 25 }, { x: 8, y: 25 }];
     this.direction = { x: 1, y: 0 };
     this.nextDirection = { x: 1, y: 0 };
     this.score = 0;
@@ -1525,7 +1526,7 @@ const SnakeGame = {
     const newHead = { x: head.x + this.direction.x, y: head.y + this.direction.y };
 
     // Wall collision
-    if (newHead.x < 0 || newHead.x >= this.gridSize || newHead.y < 0 || newHead.y >= this.gridSize) {
+    if (newHead.x < 0 || newHead.x >= this.gridCols || newHead.y < 0 || newHead.y >= this.gridRows) {
       this.endGame();
       return;
     }
@@ -1568,8 +1569,8 @@ const SnakeGame = {
     let pos, attempts = 0;
     do {
       pos = {
-        x: Math.floor(Math.random() * this.gridSize),
-        y: Math.floor(Math.random() * this.gridSize)
+        x: Math.floor(Math.random() * this.gridCols),
+        y: Math.floor(Math.random() * this.gridRows)
       };
       attempts++;
       if (attempts > 200) break;
@@ -1642,11 +1643,13 @@ const SnakeGame = {
     // Subtle grid
     ctx.strokeStyle = 'rgba(212, 175, 55, 0.05)';
     ctx.lineWidth = Math.max(1, scale);
-    for (let i = 0; i <= this.gridSize; i++) {
+    for (let i = 0; i <= this.gridCols; i++) {
       ctx.beginPath();
       ctx.moveTo(i * cs + 0.5, 0);
       ctx.lineTo(i * cs + 0.5, this.canvas.height);
       ctx.stroke();
+    }
+    for (let i = 0; i <= this.gridRows; i++) {
       ctx.beginPath();
       ctx.moveTo(0, i * cs + 0.5);
       ctx.lineTo(this.canvas.width, i * cs + 0.5);

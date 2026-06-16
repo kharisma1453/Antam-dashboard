@@ -1470,7 +1470,7 @@ input[type="number"] {
 .game-wrapper {
   position: relative;
   margin: 18px auto 14px;
-  max-width: 1000px;
+  max-width: 400px;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1482,7 +1482,7 @@ input[type="number"] {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 1;
+  aspect-ratio: 2 / 5;
 }
 
 .game-overlay {
