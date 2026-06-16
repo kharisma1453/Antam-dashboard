@@ -2181,6 +2181,52 @@ function addSizeToTrend(targetTrend, newSizeKey) {
   combineTrends(fakeTrends, { x, y, w, h });
 }
 
+function removeSizeFromTrend(trend, sizeKeyToRemove) {
+  if (!trend.combinedSizes) return; // not a combined window
+  const sizes = trend.combinedSizes.filter(s => s !== sizeKeyToRemove);
+  if (sizes.length === 0) return; // safety
+
+  // Save geometry
+  const x = trend.x, y = trend.y, w = trend.w, h = trend.h, range = trend.range;
+
+  // Tear down
+  if (trend.chart) trend.chart.destroy();
+  trend.el.remove();
+  TRENDS = TRENDS.filter(t => t.id !== trend.id);
+
+  if (sizes.length === 1) {
+    // Convert to single trend at same position
+    addTrendWindow(sizes[0], x, y, { w, h, range, normalized: false });
+  } else {
+    // Re-spawn combined with remaining sizes
+    const fakeTrends = sizes.map(sk => ({ sizeKey: sk, range, normalized: false }));
+    combineTrends(fakeTrends, { x, y, w, h });
+  }
+}
+
+function populateCombinedLegend(trend) {
+  const legendEl = trend.el.querySelector('.trend-legend');
+  if (!legendEl) return;
+  legendEl.innerHTML = '';
+  trend.combinedSizes.forEach(sk => {
+    const color = getTrendColor(sk);
+    const item = document.createElement('div');
+    item.className = 'trend-legend-item';
+    item.style.setProperty('--size-color', color);
+    item.dataset.size = sk;
+    item.innerHTML = `
+      <span class="trend-legend-dot" style="background: ${color}"></span>
+      <span class="trend-legend-label">${formatTrendSize(sk)}</span>
+      <button class="trend-legend-remove" title="Remove ${formatTrendSize(sk)}">×</button>
+    `;
+    item.querySelector('.trend-legend-remove').addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeSizeFromTrend(trend, sk);
+    });
+    legendEl.appendChild(item);
+  });
+}
+
 function setupTrendActionButtons() {
   const combineBtn = document.getElementById('trend-combine-btn');
   const resetBtn = document.getElementById('trend-reset-btn');
@@ -2243,7 +2289,10 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
       <button class="trend-close-btn" title="Close">×</button>
     </div>
     <div class="trend-window-body">
-      <canvas class="trend-canvas"></canvas>
+      <div class="trend-chart-wrap">
+        <canvas class="trend-canvas"></canvas>
+      </div>
+      <div class="trend-legend"></div>
     </div>
     <div class="trend-resize-handle" title="Drag to resize">⇲</div>
   `;
@@ -2526,7 +2575,10 @@ function combineTrends(trends, opts = {}) {
       <button class="trend-close-btn">×</button>
     </div>
     <div class="trend-window-body">
-      <canvas class="trend-canvas"></canvas>
+      <div class="trend-chart-wrap">
+        <canvas class="trend-canvas"></canvas>
+      </div>
+      <div class="trend-legend"></div>
     </div>
     <div class="trend-resize-handle">⇲</div>
   `;
@@ -2542,7 +2594,7 @@ function combineTrends(trends, opts = {}) {
       animation: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: true, position: 'top', labels: { boxWidth: 8, font: { size: 9 } } },
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: ctx => {
@@ -2560,6 +2612,9 @@ function combineTrends(trends, opts = {}) {
 
   const trend = { id, sizeKey: 'combined', combinedSizes: trends.map(t => t.sizeKey), x, y, w, h, range, normalized: allNormalized, chart, el, selected: false };
   TRENDS.push(trend);
+
+  // Populate custom legend strip with × buttons per size
+  populateCombinedLegend(trend);
 
   // Interactions for combined window: drag, resize, close (no range/normalize/pick)
   el.addEventListener('mousedown', () => { el.style.zIndex = ++trendZIndex; });
