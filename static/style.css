@@ -1908,6 +1908,11 @@ input[type="number"] {
 .trend-context-item:hover {
   background: var(--bg-card);
 }
+.trend-context-item.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: not-allowed;
+}
 .trend-context-item.danger {
   color: var(--red);
 }

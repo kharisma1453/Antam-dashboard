@@ -2147,6 +2147,54 @@ function getValidSizeKeys() {
   return SIZES.map(s => String(s).replace('.', '_'));
 }
 
+// Parse user input for y-axis value. Accepts: "0", "10000000", "10M", "1.5M",
+// "100K", "1B", "1e7", "10.000.000" (ID thousand sep), "10jt" (ID jt = million).
+// Returns number, or null if invalid.
+function parseYAxisValue(str) {
+  if (str == null) return null;
+  str = String(str).trim();
+  if (!str) return null;
+  // Detect suffix FIRST (BEFORE stripping dots) — if suffix present, dot is a decimal point, not ID thousand sep
+  let mult = 1;
+  let hasSuffix = false;
+  const lower = str.toLowerCase();
+  if (lower.endsWith('jt')) { mult = 1e6; str = str.slice(0, -2); hasSuffix = true; }
+  else if (lower.endsWith('b')) { mult = 1e9; str = str.slice(0, -1); hasSuffix = true; }
+  else if (lower.endsWith('m')) { mult = 1e6; str = str.slice(0, -1); hasSuffix = true; }
+  else if (lower.endsWith('k')) { mult = 1e3; str = str.slice(0, -1); hasSuffix = true; }
+  // Strip ID thousand separators (dots/commas) — only if no suffix (otherwise dot = decimal)
+  if (!hasSuffix && !/e/i.test(str)) {
+    str = str.replace(/\./g, '').replace(/,/g, '');
+  }
+  const v = parseFloat(str);
+  if (!isFinite(v) || v < 0) return null;
+  return v * mult;
+}
+
+// Format raw value for compact display: 15000000 → "15M", 2500 → "2.5K"
+function formatYAxisValueShort(v) {
+  if (v == null) return 'auto';
+  const abs = Math.abs(v);
+  if (abs >= 1e9) return (v / 1e9).toFixed(abs % 1e9 === 0 ? 0 : 1).replace(/\.0$/, '') + 'B';
+  if (abs >= 1e6) return (v / 1e6).toFixed(abs % 1e6 === 0 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (abs >= 1e3) return (v / 1e3).toFixed(abs % 1e3 === 0 ? 0 : 1).replace(/\.0$/, '') + 'K';
+  return String(v);
+}
+
+// Format raw value with ID thousand separator for input field: 10000000 → "10.000.000"
+function formatYAxisValueFull(v) {
+  if (v == null) return '';
+  return Math.round(v).toLocaleString('id-ID');
+}
+
+// Returns the current y-axis range display: "auto" or "0 - 10M"
+function getYRangeLabel(trend) {
+  if (trend.yMin == null && trend.yMax == null) return 'auto';
+  const lo = trend.yMin != null ? formatYAxisValueShort(trend.yMin) : 'auto';
+  const hi = trend.yMax != null ? formatYAxisValueShort(trend.yMax) : 'auto';
+  return `${lo} - ${hi}`;
+}
+
 function initTrendBuilder() {
   // Setup catalog + canvas DnD + action buttons immediately (doesn't need data)
   setupTrendCatalog();
@@ -2253,6 +2301,9 @@ function addSizeToTrend(targetTrend, newSizeKey) {
   const endDate = targetTrend.endDate || null;
   // Preserve y-ref if exists (combined only)
   const yRefSize = targetTrend.yRefSize || sizes[0];
+  // Preserve y-axis custom range
+  const yMin = targetTrend.yMin != null ? targetTrend.yMin : null;
+  const yMax = targetTrend.yMax != null ? targetTrend.yMax : null;
 
   // Tear down old
   if (targetTrend.chart) targetTrend.chart.destroy();
@@ -2261,7 +2312,7 @@ function addSizeToTrend(targetTrend, newSizeKey) {
 
   // Spawn a new combined trend at the same spot
   const fakeTrends = sizes.map(sk => ({ sizeKey: sk, normalized: false }));
-  combineTrends(fakeTrends, { x, y, w, h, startDate, endDate, yRefSize });
+  combineTrends(fakeTrends, { x, y, w, h, startDate, endDate, yRefSize, yMin, yMax });
 }
 
 function removeSizeFromTrend(trend, sizeKeyToRemove) {
@@ -2275,6 +2326,9 @@ function removeSizeFromTrend(trend, sizeKeyToRemove) {
   const endDate = trend.endDate || null;
   // Pick a new y-ref if current one is being removed
   const yRefSize = trend.yRefSize === sizeKeyToRemove ? sizes[0] : trend.yRefSize;
+  // Preserve y-axis custom range
+  const yMin = trend.yMin != null ? trend.yMin : null;
+  const yMax = trend.yMax != null ? trend.yMax : null;
 
   // Tear down
   if (trend.chart) trend.chart.destroy();
@@ -2283,11 +2337,11 @@ function removeSizeFromTrend(trend, sizeKeyToRemove) {
 
   if (sizes.length === 1) {
     // Convert to single trend at same position (no y-ref needed)
-    addTrendWindow(sizes[0], x, y, { w, h, startDate, endDate, normalized: false });
+    addTrendWindow(sizes[0], x, y, { w, h, startDate, endDate, normalized: false, yMin, yMax });
   } else {
     // Re-spawn combined with remaining sizes
     const fakeTrends = sizes.map(sk => ({ sizeKey: sk, normalized: false }));
-    combineTrends(fakeTrends, { x, y, w, h, startDate, endDate, yRefSize });
+    combineTrends(fakeTrends, { x, y, w, h, startDate, endDate, yRefSize, yMin, yMax });
   }
 }
 
@@ -2399,7 +2453,7 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
 
   document.getElementById('trends-canvas').appendChild(el);
 
-  const trend = { id, sizeKey, x, y, w, h, startDate, endDate, normalized, chart: null, el, selected: !!opts.selected };
+  const trend = { id, sizeKey, x, y, w, h, startDate, endDate, normalized, yMin: opts.yMin != null ? opts.yMin : null, yMax: opts.yMax != null ? opts.yMax : null, chart: null, el, selected: !!opts.selected };
   TRENDS.push(trend);
 
   setupTrendWindowInteractions(trend);
@@ -2543,6 +2597,19 @@ function createTrendChart(trend) {
 
   const color = getTrendColor(trend.sizeKey);
   const ctx = trend.el.querySelector('.trend-canvas');
+  // Y-axis range: custom if set (and not normalized), else auto
+  const useCustomY = !trend.normalized && trend.yMin != null && trend.yMax != null;
+  const yScale = {
+    min: trend.normalized ? 50 : (useCustomY ? trend.yMin : undefined),
+    max: trend.normalized ? 200 : (useCustomY ? trend.yMax : undefined),
+    ticks: {
+      maxTicksLimit: 4,
+      font: { size: 9 },
+      callback: v => trend.normalized ? v.toFixed(0) : 'Rp ' + (v / 1000).toFixed(0) + 'k',
+    },
+    grid: { color: 'rgba(255,255,255,0.05)' },
+    title: { display: true, text: yLabel, font: { size: 9 }, color: '#9aa0a6' },
+  };
   trend.chart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -2575,15 +2642,7 @@ function createTrendChart(trend) {
       },
       scales: {
         x: { type: 'time', time: { unit: 'month' }, ticks: { maxTicksLimit: 5, font: { size: 9 } }, grid: { display: false } },
-        y: {
-          ticks: {
-            maxTicksLimit: 4,
-            font: { size: 9 },
-            callback: v => trend.normalized ? v.toFixed(0) : 'Rp ' + (v / 1000).toFixed(0) + 'k',
-          },
-          grid: { color: 'rgba(255,255,255,0.05)' },
-          title: { display: true, text: yLabel, font: { size: 9 }, color: '#9aa0a6' },
-        },
+        y: yScale,
       },
     },
   });
@@ -2600,7 +2659,7 @@ function updateTrendCombineButton() {
 // Build the Chart.js config (labels, datasets, scales) for a combined trend window.
 // All sizes share a single y-axis. yRefSize controls the y-axis range + label.
 // Returns null if no records in range.
-function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized, yRefSize) {
+function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized, yRefSize, customYMin = null, customYMax = null) {
   const records = getRecordsForTrendDateRange(startDate, endDate);
   if (!records.length) return null;
   const dates = records.map(r => r.date);
@@ -2625,6 +2684,11 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
   if (normalized) {
     yMin = 50; yMax = 200;
     yLabel = 'Index (100 = start)';
+  } else if (customYMin != null && customYMax != null && customYMin < customYMax) {
+    // User-set custom range
+    yMin = customYMin;
+    yMax = customYMax;
+    yLabel = `Harga (${formatTrendSize(yRefSize)})`;
   } else {
     // Find global min/max across every size's data
     let globalMin = Infinity, globalMax = -Infinity;
@@ -2685,7 +2749,7 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
 
 // Re-render a combined trend's chart (after date, normalize, or y-ref change)
 function rebuildCombinedChart(trend) {
-  const config = buildCombinedChartConfig(trend.startDate, trend.endDate, trend.combinedSizes, trend.normalized, trend.yRefSize);
+  const config = buildCombinedChartConfig(trend.startDate, trend.endDate, trend.combinedSizes, trend.normalized, trend.yRefSize, trend.yMin, trend.yMax);
   if (!config) {
     if (trend.chart) { trend.chart.destroy(); trend.chart = null; }
     return;
@@ -2735,11 +2799,14 @@ function combineTrends(trends, opts = {}) {
   const yRefSize = (opts.yRefSize && combinedSizes.includes(opts.yRefSize)) ? opts.yRefSize : combinedSizes[0];
 
   // Validate that we have data
-  const testConfig = buildCombinedChartConfig(startDate, endDate, combinedSizes, allNormalized, yRefSize);
+  const testConfig = buildCombinedChartConfig(startDate, endDate, combinedSizes, allNormalized, yRefSize, opts.yMin, opts.yMax);
   if (!testConfig) return;
 
   const id = `trend-combined-${Date.now()}`;
   const x = opts.x ?? 40, y = opts.y ?? 40, w = opts.w ?? 640, h = opts.h ?? 400;
+  // Y-axis custom range (null = auto)
+  const yMin = (opts.yMin != null && isFinite(opts.yMin)) ? opts.yMin : null;
+  const yMax = (opts.yMax != null && isFinite(opts.yMax)) ? opts.yMax : null;
   const el = document.createElement('div');
   el.className = 'trend-window trend-combined';
   el.dataset.trendId = id;
@@ -2784,7 +2851,7 @@ function combineTrends(trends, opts = {}) {
 
   document.getElementById('trends-canvas').appendChild(el);
 
-  const trend = { id, sizeKey: 'combined', combinedSizes, x, y, w, h, startDate, endDate, normalized: allNormalized, yRefSize, chart: null, el, selected: false };
+  const trend = { id, sizeKey: 'combined', combinedSizes, x, y, w, h, startDate, endDate, normalized: allNormalized, yRefSize, yMin, yMax, chart: null, el, selected: false };
   TRENDS.push(trend);
 
   // Build chart via helper
@@ -2928,6 +2995,15 @@ function showTrendContextMenu(trend, clientX, clientY) {
     </div>`;
   }
 
+  // Y-axis range (single + combined). Disabled when normalized (range fixed at 50-200).
+  const isNorm = trend.normalized;
+  const rangeLabel = isNorm ? '50 - 200' : getYRangeLabel(trend);
+  const rangeDisabled = isNorm;
+  html += `<div class="trend-context-item ${rangeDisabled ? 'disabled' : ''}" data-action="set-yrange">
+    <span class="trend-context-label-left">📏 Y-axis range</span>
+    <span class="trend-context-label-right"><b>${rangeLabel}</b> <span class="trend-context-caret">${rangeDisabled ? '' : '▸'}</span></span>
+  </div>`;
+
   html += `<hr class="trend-context-sep">`;
 
   // Add / remove size
@@ -2990,7 +3066,7 @@ function showTrendContextMenu(trend, clientX, clientY) {
       handleContextAction(trend, action, item, menu);
     });
     // Submenu: show on hover
-    if (['set-yref', 'add-size', 'remove-size', 'convert-combined'].includes(action)) {
+    if (['set-yref', 'set-yrange', 'add-size', 'remove-size', 'convert-combined'].includes(action)) {
       item.addEventListener('mouseenter', () => showContextSubmenu(trend, item, action, menu));
     }
   });
@@ -3036,6 +3112,58 @@ function showContextSubmenu(trend, parentItem, action, parentMenu) {
         <span class="trend-context-check ${isRef ? 'checked' : ''}">${isRef ? '✓' : ''}</span>
       </div>`;
     });
+  } else if (action === 'set-yrange') {
+    // Y-axis range submenu
+    html += `<div class="trend-context-header"><span>Y-axis range</span></div>`;
+    // Auto option
+    const isAuto = trend.yMin == null && trend.yMax == null;
+    html += `<div class="trend-context-item" data-action="yrange-auto">
+      <span class="trend-context-label-left">Auto (fit to data)</span>
+      <span class="trend-context-check ${isAuto ? 'checked' : ''}">${isAuto ? '✓' : ''}</span>
+    </div>`;
+    // Show current custom range, if any
+    if (!isAuto) {
+      html += `<div class="trend-context-item" data-action="yrange-show">
+        <span class="trend-context-label-left" style="padding-left: 12px; color: #d4af37;">${getYRangeLabel(trend)}</span>
+        <span class="trend-context-label-right"></span>
+      </div>`;
+    }
+    html += `<hr class="trend-context-sep">`;
+    // Set min / max
+    html += `<div class="trend-context-item" data-action="yrange-setmin">
+      <span class="trend-context-label-left">Set min${trend.yMin != null ? `: ${formatYAxisValueShort(trend.yMin)}` : '...'}</span>
+      <span class="trend-context-label-right"></span>
+    </div>`;
+    html += `<div class="trend-context-item" data-action="yrange-setmax">
+      <span class="trend-context-label-left">Set max${trend.yMax != null ? `: ${formatYAxisValueShort(trend.yMax)}` : '...'}</span>
+      <span class="trend-context-label-right"></span>
+    </div>`;
+    html += `<hr class="trend-context-sep">`;
+    // Quick presets
+    html += `<div class="trend-context-header" style="font-size: 10px; padding: 4px 10px; color: #9aa0a6; font-weight: 500;">Quick presets</div>`;
+    const presets = [
+      { label: '0 - 5M', min: 0, max: 5e6 },
+      { label: '0 - 10M', min: 0, max: 10e6 },
+      { label: '0 - 20M', min: 0, max: 20e6 },
+      { label: '0 - 50M', min: 0, max: 50e6 },
+      { label: '0 - 100M', min: 0, max: 100e6 },
+      { label: '5M - 15M', min: 5e6, max: 15e6 },
+    ];
+    presets.forEach(p => {
+      const isCurrent = trend.yMin === p.min && trend.yMax === p.max;
+      html += `<div class="trend-context-item" data-action="yrange-preset" data-min="${p.min}" data-max="${p.max}">
+        <span class="trend-context-label-left" style="padding-left: 12px;">${p.label}</span>
+        <span class="trend-context-check ${isCurrent ? 'checked' : ''}">${isCurrent ? '✓' : ''}</span>
+      </div>`;
+    });
+    html += `<hr class="trend-context-sep">`;
+    // Reset
+    if (!isAuto) {
+      html += `<div class="trend-context-item" data-action="yrange-auto">
+        <span class="trend-context-label-left">↻ Reset to auto</span>
+        <span class="trend-context-label-right"></span>
+      </div>`;
+    }
   } else if (action === 'add-size') {
     html += `<div class="trend-context-header"><span>Add size</span></div>`;
     const available = getValidSizeKeys().filter(sk => !trend.combinedSizes.includes(sk));
@@ -3093,6 +3221,57 @@ function showContextSubmenu(trend, parentItem, action, parentMenu) {
         const yrefSelect = trend.el.querySelector('.trend-yref-select');
         if (yrefSelect) yrefSelect.value = sk;
         rebuildCombinedChart(trend);
+        saveTrendLayout();
+        hideTrendContextMenu();
+      } else if (act === 'yrange-auto') {
+        // Reset to auto (clear custom range)
+        trend.yMin = null;
+        trend.yMax = null;
+        if (trend.sizeKey === 'combined') {
+          rebuildCombinedChart(trend);
+        } else {
+          createTrendChart(trend);
+        }
+        saveTrendLayout();
+        hideTrendContextMenu();
+      } else if (act === 'yrange-setmin' || act === 'yrange-setmax') {
+        const isMin = act === 'yrange-setmin';
+        const currentVal = isMin ? trend.yMin : trend.yMax;
+        const displayVal = currentVal != null ? formatYAxisValueFull(currentVal) : '';
+        const promptMsg = isMin
+          ? 'Set MIN Y-axis value.\nFormat: 0, 100K, 10M, 1.5M, 10.000.000, 1e7'
+          : 'Set MAX Y-axis value.\nFormat: 10000000, 10M, 20M, 5jt';
+        const input = prompt(promptMsg, displayVal);
+        if (input == null) return; // user cancelled
+        const v = parseYAxisValue(input);
+        if (v == null) {
+          alert('Nilai tidak valid. Coba: 0, 100K, 10M, 10.000.000, dll.');
+          return;
+        }
+        if (isMin) trend.yMin = v;
+        else trend.yMax = v;
+        // Validate: both set, min < max
+        if (trend.yMin != null && trend.yMax != null && trend.yMin >= trend.yMax) {
+          alert('Min harus lebih kecil dari max.\nMin saat ini: ' + formatYAxisValueShort(trend.yMin) + '\nMax saat ini: ' + formatYAxisValueShort(trend.yMax));
+          if (isMin) trend.yMin = currentVal; // revert
+          else trend.yMax = currentVal;
+          return;
+        }
+        if (trend.sizeKey === 'combined') {
+          rebuildCombinedChart(trend);
+        } else {
+          createTrendChart(trend);
+        }
+        saveTrendLayout();
+        hideTrendContextMenu();
+      } else if (act === 'yrange-preset') {
+        trend.yMin = parseFloat(item.dataset.min);
+        trend.yMax = parseFloat(item.dataset.max);
+        if (trend.sizeKey === 'combined') {
+          rebuildCombinedChart(trend);
+        } else {
+          createTrendChart(trend);
+        }
         saveTrendLayout();
         hideTrendContextMenu();
       } else if (act === 'add-size-pick') {
@@ -3175,6 +3354,7 @@ function handleContextAction(trend, action, item, menu) {
     }
     // Submenu actions are handled in showContextSubmenu
     case 'set-yref':
+    case 'set-yrange':
     case 'add-size':
     case 'remove-size':
     case 'convert-combined':
@@ -3239,6 +3419,8 @@ function resetTrendToDefaults(trend) {
   trend.startDate = defaultStartDate();
   trend.endDate = null;
   trend.normalized = false;
+  trend.yMin = null;
+  trend.yMax = null;
   if (trend.sizeKey === 'combined') {
     trend.yRefSize = trend.combinedSizes[0];
   }
@@ -3279,6 +3461,8 @@ function saveTrendLayout() {
     endDate: t.endDate || null,
     normalized: t.normalized,
     selected: !!t.selected,
+    yMin: t.yMin != null ? t.yMin : null,
+    yMax: t.yMax != null ? t.yMax : null,
   }));
   try {
     localStorage.setItem('antam-trends-layout', JSON.stringify(layout));
@@ -3308,6 +3492,8 @@ function loadTrendLayout() {
       } else if (t.range) {
         opts.range = t.range; // addTrendWindow will convert via convertOldRangeToDateRange
       }
+      if (t.yMin != null) opts.yMin = t.yMin;
+      if (t.yMax != null) opts.yMax = t.yMax;
       addTrendWindow(t.sizeKey, t.x, t.y, opts);
     });
   } catch (e) {
