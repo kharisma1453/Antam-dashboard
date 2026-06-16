@@ -1418,7 +1418,7 @@ const SnakeGame = {
   score: 0,
   goldCollected: 0,
   highScore: 0,
-  speed: 200,
+  speed: 300,
   minSpeed: 70,
   tickTimer: null,
   paused: true,
@@ -1479,7 +1479,7 @@ const SnakeGame = {
     this.nextDirection = { x: 1, y: 0 };
     this.score = 0;
     this.goldCollected = 0;
-    this.speed = 200;
+    this.speed = 300;
     this.paused = true;
     this.gameOver = false;
     this.spawnFood();
