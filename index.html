@@ -326,14 +326,14 @@
           <h3>🤖 Prediksi Nilai Emas (ML)</h3>
           <span class="pred-status" id="pred-status">Loading predictions...</span>
         </div>
-        <p class="roi-pred-hint">Proyeksi harga emas masa depan berdasarkan time series analysis. Size &amp; kepingan disinkronkan otomatis dari baris pertama ROI Calculator. <span id="pred-model-info">—</span></p>
+        <p class="roi-pred-hint">Proyeksi harga emas masa depan berdasarkan time series analysis. Prediksi di-aggregate dari <strong>semua baris</strong> ROI Calculator (size &amp; kepingan per baris dipakai). <span id="pred-model-info">—</span></p>
 
         <div class="roi-pred-form">
           <div class="roi-pred-summary">
             <span class="roi-pred-summary-label">Prediksi untuk:</span>
             <span class="roi-pred-chip" id="pred-size-display">—</span>
             <span class="roi-pred-chip" id="pred-pieces-display">—</span>
-            <span class="roi-pred-hint-inline">dari ROI baris 1</span>
+            <span class="roi-pred-hint-inline">aggregate semua baris ROI</span>
           </div>
           <div class="roi-pred-target">
             <label>Tanggal Jual (Target)</label>
@@ -382,6 +382,24 @@
           <div class="pred-meta-item">
             <span class="pred-meta-label">Confidence interval</span>
             <span class="pred-meta-value" id="pred-ci">—</span>
+          </div>
+        </div>
+
+        <div class="pred-breakdown" id="pred-breakdown" style="display:none;">
+          <h4>Detail per Baris (BASE scenario)</h4>
+          <div class="pred-breakdown-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tanggal Beli</th>
+                  <th>Ukuran × Kepingan</th>
+                  <th>Modal</th>
+                  <th>Predicted (BASE)</th>
+                  <th>PnL</th>
+                </tr>
+              </thead>
+              <tbody id="pred-breakdown-body"></tbody>
+            </table>
           </div>
         </div>
 

@@ -1268,6 +1268,7 @@ function computeROI() {
   };
 
   if (validRows.length === 0) {
+    LAST_COMPUTED = [];
     reset();
     return;
   }
@@ -1302,6 +1303,7 @@ function computeROI() {
   }).filter(Boolean);
 
   if (computed.length === 0) {
+    LAST_COMPUTED = [];
     reset();
     document.getElementById('roi-modal-detail').textContent = 'Tidak ada data valid untuk kombinasi input yang dimasukkan';
     return;
@@ -1390,7 +1392,8 @@ function computeROI() {
   document.getElementById('roi-period').textContent =
     `⏱️ Holding period: ${formatHoldingPeriod(totalDays)} · dari ${formatDateID(earliest)} (pembelian pertama) sampai ${formatDateID(lastDate)}`;
 
-  // Auto-sync prediction panel with current ROI first row
+  // Auto-sync prediction panel with current ROI rows
+  LAST_COMPUTED = computed;
   if (typeof updatePrediction === 'function') updatePrediction();
 }
 
@@ -1802,6 +1805,7 @@ function initSnakeGame() {
 // =============================================================
 let PRED = null;  // predictions.json cache
 let PRED_DATA_LOADED = null;  // last_date from data.json for default dates
+let LAST_COMPUTED = [];  // last successful per-row computation from computeROI (used by updatePrediction)
 
 function loadPredictions() {
   return fetch('/data/predictions.json', { cache: 'no-cache' })
@@ -1881,15 +1885,14 @@ function findClosestHorizon(sellDate, lastDateStr, horizons) {
 function updatePrediction() {
   if (!PRED) return;
 
-  // Read size + pieces from first ROI row (auto-sync)
-  const roiRows = getROIRows();
-  const firstRow = roiRows[0];
+  const validRows = LAST_COMPUTED || [];
+  const sellDate = document.getElementById('pred-sell-date').value;
   const sizeChip = document.getElementById('pred-size-display');
   const piecesChip = document.getElementById('pred-pieces-display');
-  const sellDate = document.getElementById('pred-sell-date').value;
+  const breakdownEl = document.getElementById('pred-breakdown');
+  const breakdownBody = document.getElementById('pred-breakdown-body');
 
-  if (!firstRow || !firstRow.valid || !sellDate) {
-    // No valid ROI input — clear display
+  const clearDisplay = () => {
     if (sizeChip) sizeChip.textContent = '—';
     if (piecesChip) piecesChip.textContent = '—';
     ['pred-bear-value', 'pred-base-value', 'pred-bull-value'].forEach((id) => {
@@ -1900,60 +1903,122 @@ function updatePrediction() {
       const el = document.getElementById(id);
       if (el) el.textContent = '—';
     });
+    if (breakdownBody) breakdownBody.innerHTML = '';
+    if (breakdownEl) breakdownEl.style.display = 'none';
+  };
+
+  if (validRows.length === 0 || !sellDate) {
+    clearDisplay();
     return;
   }
 
-  // Map: ROI uses "0.5", predictions JSON uses "0_5"
-  const sizeKey = firstRow.sizeRef === '0.5' ? '0_5' : firstRow.sizeRef;
-  const pieces = firstRow.pieces;
+  // Aggregate across all valid rows
+  let totalBuyCost = 0;
+  let totalGrams = 0;
+  let totalPieces = 0;
+  const sellTotals = { bear: 0, base: 0, bull: 0 };
+  const rowDetails = [];
+  let horizonInfo = null; // for meta display (use first row)
 
-  // Update summary chips
-  if (sizeChip) sizeChip.textContent = firstRow.sizeRef + 'g';
-  if (piecesChip) piecesChip.textContent = pieces + ' keping';
+  for (const row of validRows) {
+    const sizeKey = row.sizeRef === '0.5' ? '0_5' : row.sizeRef;
+    const sz = PRED.sizes[sizeKey];
+    if (!sz) continue;
+    const horizon = findClosestHorizon(sellDate, sz.current_date, sz.predictions);
+    if (!horizon) continue;
 
-  const sz = PRED.sizes[sizeKey];
-  if (!sz || !pieces) return;
+    const rowSellBear = horizon.p25 * row.pieces;
+    const rowSellBase = horizon.base * row.pieces;
+    const rowSellBull = horizon.p75 * row.pieces;
 
-  const horizon = findClosestHorizon(sellDate, sz.current_date, sz.predictions);
-  if (!horizon) return;
+    totalBuyCost += row.modal;
+    totalGrams += row.rowGrams;
+    totalPieces += row.pieces;
+    sellTotals.bear += rowSellBear;
+    sellTotals.base += rowSellBase;
+    sellTotals.bull += rowSellBull;
 
-  const buyPrice = sz.current_price;
-  const buyCost = buyPrice * pieces;
+    rowDetails.push({
+      buyDate: row.actualBuyDate,
+      sizeRef: row.sizeRef,
+      pieces: row.pieces,
+      modal: row.modal,
+      buyPrice: row.buyPrice,
+      sellBase: rowSellBase,
+      sizeLabel: sz.size_label,
+    });
 
-  // Bear/Base/Bull use p25/base/p75
+    if (!horizonInfo) horizonInfo = { sz, horizon };
+  }
+
+  if (totalBuyCost === 0 || rowDetails.length === 0) {
+    clearDisplay();
+    return;
+  }
+
+  // Summary chips: single-row vs multi-row
+  if (validRows.length === 1) {
+    if (sizeChip) sizeChip.textContent = validRows[0].sizeRef + 'g';
+    if (piecesChip) piecesChip.textContent = validRows[0].pieces + ' keping';
+  } else {
+    if (sizeChip) sizeChip.textContent = validRows.length + ' baris';
+    if (piecesChip) piecesChip.textContent = totalGrams.toFixed(1) + 'g total';
+  }
+
+  // 3 scenario cards (aggregate PnL)
   const scenarios = [
-    { key: 'bear', price: horizon.p25, label: 'bear', cls: 'pred-bear' },
-    { key: 'base', price: horizon.base, label: 'base', cls: 'pred-base' },
-    { key: 'bull', price: horizon.p75, label: 'bull', cls: 'pred-bull' },
+    { key: 'bear', sellValue: sellTotals.bear },
+    { key: 'base', sellValue: sellTotals.base },
+    { key: 'bull', sellValue: sellTotals.bull },
   ];
-
   scenarios.forEach((sc) => {
-    const sellValue = sc.price * pieces;
-    const pnl = sellValue - buyCost;
-    const pct = (pnl / buyCost) * 100;
+    const pnl = sc.sellValue - totalBuyCost;
+    const pct = (pnl / totalBuyCost) * 100;
     const sign = pnl >= 0 ? '+' : '−';
-    const cls = sc.key;
-    const valEl = document.getElementById(`pred-${cls}-value`);
-    const pctEl = document.getElementById(`pred-${cls}-pct`);
-    const noteEl = document.getElementById(`pred-${cls}-note`);
+    const valEl = document.getElementById(`pred-${sc.key}-value`);
+    const pctEl = document.getElementById(`pred-${sc.key}-pct`);
+    const noteEl = document.getElementById(`pred-${sc.key}-note`);
     if (valEl) valEl.textContent = sign + idrP(Math.abs(pnl));
     if (pctEl) pctEl.textContent = `${sign}${(Math.abs(pct)).toFixed(2)}% · ${sign}${idrP(Math.abs(pnl))}`;
     if (noteEl) {
-      noteEl.innerHTML = `Jual: ${sign}${idrP(Math.abs(sellValue))}<br>Modal: ${idrP(buyCost)}`;
+      noteEl.innerHTML = `Jual: ${sign}${idrP(Math.abs(sc.sellValue))}<br>Modal: ${idrP(totalBuyCost)}`;
     }
   });
 
-  // Meta
+  // Meta (use first row's size for CAGR/horizon display)
   const setMeta = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   };
-  setMeta('pred-buy-price', idrP(buyPrice) + ' / ' + sz.size_label);
-  setMeta('pred-cagr-5y', sz.cagr_5y != null ? `${sz.cagr_5y >= 0 ? '+' : ''}${sz.cagr_5y.toFixed(2)}%` : '—');
-  setMeta('pred-cagr-10y', sz.cagr_10y != null ? `${sz.cagr_10y >= 0 ? '+' : ''}${sz.cagr_10y.toFixed(2)}%` : '—');
-  setMeta('pred-horizon', `${horizon.horizon} (${horizon.date})`);
-  // CI: p5-p95 range
-  const ciLow = horizon.p5;
-  const ciHigh = horizon.p95;
-  setMeta('pred-ci', `${idrP(ciLow)} – ${idrP(ciHigh)}`);
+  const displaySz = horizonInfo.sz;
+  const displayHorizon = horizonInfo.horizon;
+  const avgBuyPerPiece = totalBuyCost / totalPieces;
+  setMeta('pred-buy-price', `Avg: ${idrP(avgBuyPerPiece)} / ${displaySz.size_label}`);
+  setMeta('pred-cagr-5y', displaySz.cagr_5y != null ? `${displaySz.cagr_5y >= 0 ? '+' : ''}${displaySz.cagr_5y.toFixed(2)}%` : '—');
+  setMeta('pred-cagr-10y', displaySz.cagr_10y != null ? `${displaySz.cagr_10y >= 0 ? '+' : ''}${displaySz.cagr_10y.toFixed(2)}%` : '—');
+  setMeta('pred-horizon', `${displayHorizon.horizon} (${displayHorizon.date})`);
+  setMeta('pred-ci', `${idrP(displayHorizon.p5)} – ${idrP(displayHorizon.p95)}`);
+
+  // Per-row breakdown table
+  if (breakdownBody && breakdownEl) {
+    breakdownBody.innerHTML = rowDetails.map((rd) => {
+      const sizeLabel = rd.sizeRef.replace('.', ',') + 'g';
+      const pnl = rd.sellBase - rd.modal;
+      const pnlSign = pnl >= 0 ? '+' : '−';
+      return `<tr>
+        <td>${formatDateID(rd.buyDate)}</td>
+        <td>${sizeLabel} × ${rd.pieces}</td>
+        <td>${idrP(rd.modal)}</td>
+        <td>${idrP(rd.sellBase)}</td>
+        <td class="pred-breakdown-pnl ${pnl >= 0 ? 'positive' : 'negative'}">${pnlSign}${idrP(Math.abs(pnl))}</td>
+      </tr>`;
+    }).join('') + `<tr class="pred-breakdown-total">
+      <td><strong>Total</strong></td>
+      <td><strong>${totalPieces} keping · ${totalGrams.toFixed(1)}g</strong></td>
+      <td><strong>${idrP(totalBuyCost)}</strong></td>
+      <td><strong>${idrP(sellTotals.base)}</strong></td>
+      <td class="pred-breakdown-pnl ${(sellTotals.base - totalBuyCost) >= 0 ? 'positive' : 'negative'}"><strong>${(sellTotals.base - totalBuyCost) >= 0 ? '+' : '−'}${idrP(Math.abs(sellTotals.base - totalBuyCost))}</strong></td>
+    </tr>`;
+    breakdownEl.style.display = 'block';
+  }
 }
