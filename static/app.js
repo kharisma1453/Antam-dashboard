@@ -2110,13 +2110,75 @@ function setupTrendCanvas() {
     const sizeKey = e.dataTransfer.getData('text/plain');
     if (!sizeKey) return;
     const rect = canvas.getBoundingClientRect();
-    // Center window on drop point, with 240/30 offset (half of 480x320 minus header)
-    const x = e.clientX - rect.left - 240;
-    const y = e.clientY - rect.top - 30;
-    // Cascade: if there are existing windows, offset by 30px to avoid perfect overlap
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // If drop point is on an existing window → combine into it (add as new dataset)
+    const target = getTrendAtPoint(x, y);
+    if (target) {
+      addSizeToTrend(target, sizeKey);
+      return;
+    }
+
+    // Otherwise create new window centered on drop point
+    // Cascade: if there are existing windows, offset by 24px to avoid perfect overlap
     const offset = TRENDS.length * 24;
-    addTrendWindow(sizeKey, Math.max(8, x + offset), Math.max(8, y + offset));
+    addTrendWindow(sizeKey, Math.max(8, x - 240 + offset), Math.max(8, y - 30 + offset));
   });
+}
+
+function getTrendAtPoint(x, y) {
+  // Iterate in reverse so top-most window wins
+  for (let i = TRENDS.length - 1; i >= 0; i--) {
+    const t = TRENDS[i];
+    if (x >= t.x && x <= t.x + t.w && y >= t.y && y <= t.y + t.h) {
+      return t;
+    }
+  }
+  return null;
+}
+
+function flashTrend(trend) {
+  const el = trend.el;
+  const color = getTrendColor(trend.sizeKey === 'combined' ? '1' : trend.sizeKey);
+  el.style.transition = 'transform 0.2s, box-shadow 0.2s';
+  el.style.transform = 'scale(1.04)';
+  el.style.boxShadow = `0 0 0 3px ${color}, 0 6px 20px rgba(0, 0, 0, 0.45)`;
+  setTimeout(() => {
+    el.style.transform = '';
+    el.style.boxShadow = '';
+  }, 280);
+}
+
+function addSizeToTrend(targetTrend, newSizeKey) {
+  // Collect existing sizes (combinedSizes for combined, else [sizeKey])
+  let sizes = targetTrend.combinedSizes
+    ? [...targetTrend.combinedSizes]
+    : [targetTrend.sizeKey];
+
+  // Duplicate: flash to indicate "udah ada" and skip
+  if (sizes.includes(newSizeKey)) {
+    flashTrend(targetTrend);
+    return;
+  }
+
+  sizes.push(newSizeKey);
+
+  // Save geometry + range so the new combined window keeps the same position
+  const x = targetTrend.x;
+  const y = targetTrend.y;
+  const w = targetTrend.w;
+  const h = targetTrend.h;
+  const range = targetTrend.range;
+
+  // Tear down old
+  if (targetTrend.chart) targetTrend.chart.destroy();
+  targetTrend.el.remove();
+  TRENDS = TRENDS.filter(t => t.id !== targetTrend.id);
+
+  // Spawn a new combined trend at the same spot
+  const fakeTrends = sizes.map(sk => ({ sizeKey: sk, range, normalized: false }));
+  combineTrends(fakeTrends, { x, y, w, h });
 }
 
 function setupTrendActionButtons() {
@@ -2391,7 +2453,7 @@ function updateTrendCombineButton() {
   btn.textContent = `🔗 Combine (${selected.length})`;
 }
 
-function combineTrends(trends) {
+function combineTrends(trends, opts = {}) {
   if (trends.length < 2) return;
   // Use the most common range (just take first for now)
   const range = trends[0].range;
@@ -2447,7 +2509,7 @@ function combineTrends(trends) {
   }
 
   const id = `trend-combined-${Date.now()}`;
-  const x = 40, y = 40, w = 640, h = 400;
+  const x = opts.x ?? 40, y = opts.y ?? 40, w = opts.w ?? 640, h = opts.h ?? 400;
   const el = document.createElement('div');
   el.className = 'trend-window trend-combined';
   el.dataset.trendId = id;
@@ -2496,7 +2558,7 @@ function combineTrends(trends) {
     },
   });
 
-  const trend = { id, sizeKey: 'combined', x, y, w, h, range, normalized: allNormalized, chart, el, selected: false };
+  const trend = { id, sizeKey: 'combined', combinedSizes: trends.map(t => t.sizeKey), x, y, w, h, range, normalized: allNormalized, chart, el, selected: false };
   TRENDS.push(trend);
 
   // Interactions for combined window: drag, resize, close (no range/normalize/pick)
