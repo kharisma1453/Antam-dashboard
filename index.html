@@ -409,6 +409,35 @@
       </div>
     </section>
 
+    <!-- ===== Trend Builder (Drag & Drop, PI Vision style) ===== -->
+    <section class="trends-section">
+      <div class="section-header">
+        <div>
+          <h2>🧪 Trend Builder</h2>
+          <p class="section-subtitle">Drag size dari library ke canvas, atau tick 2+ window lalu <strong>Combine</strong> buat overlay compare. Window bisa di-drag, di-resize, di-close. Layout kesimpan otomatis.</p>
+        </div>
+        <div class="trends-actions">
+          <button class="trend-btn" id="trend-combine-btn" disabled>🔗 Combine (0)</button>
+          <button class="trend-btn trend-btn-ghost" id="trend-reset-btn">🗑️ Reset</button>
+        </div>
+      </div>
+
+      <div class="trends-layout">
+        <aside class="trends-library">
+          <h3>Library</h3>
+          <p class="trends-library-hint">Drag ke canvas →</p>
+          <ul class="trends-catalog" id="trends-catalog"></ul>
+        </aside>
+        <div class="trends-canvas" id="trends-canvas">
+          <div class="trends-canvas-empty" id="trends-canvas-empty">
+            <span class="trends-empty-icon">🪟</span>
+            <p>Drop size card dari library buat mulai</p>
+            <p class="trends-empty-hint">Window bisa di-drag, di-resize, di-close, atau di-combine (tick 2+ dulu)</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="game-section">
       <div class="section-header">
         <div>

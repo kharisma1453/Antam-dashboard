@@ -1436,6 +1436,307 @@ input[type="number"] {
   }
 }
 
+/* ====== Trend Builder (Drag & Drop) ====== */
+.trends-section + .game-section {
+  margin-top: 24px;
+}
+.trends-section .trends-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.trend-btn {
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+  color: #0a0e1a;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.15s;
+}
+.trend-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+.trend-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.trend-btn-ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.trend-btn-ghost:hover:not(:disabled) {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+
+.trends-layout {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  min-height: 520px;
+}
+
+.trends-library {
+  flex: 0 0 200px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.trends-library h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.trends-library-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.trends-catalog {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+}
+.trend-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: grab;
+  user-select: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  transition: background 0.1s, border-color 0.1s, transform 0.1s;
+}
+.trend-source:hover {
+  background: var(--bg);
+  border-color: var(--size-color, var(--gold));
+}
+.trend-source:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+  border-color: var(--size-color, var(--gold));
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.15);
+}
+.trend-source-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--size-color, var(--gold));
+  flex-shrink: 0;
+}
+.trend-source-label {
+  flex: 1;
+}
+
+.trends-canvas {
+  flex: 1;
+  position: relative;
+  background: var(--bg-elevated);
+  background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  min-height: 520px;
+  overflow: hidden;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.trends-canvas.drag-over {
+  border-color: var(--gold);
+  border-style: solid;
+  background-color: rgba(212, 175, 55, 0.04);
+}
+.trends-canvas-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  text-align: center;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.trends-canvas-empty.hidden {
+  opacity: 0;
+}
+.trends-empty-icon {
+  font-size: 42px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+.trends-canvas-empty p {
+  font-size: 13px;
+  margin: 2px 0;
+}
+.trends-empty-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.trend-window {
+  position: absolute;
+  background: var(--bg-card);
+  border: 1px solid var(--size-color, var(--border));
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 300px;
+  min-height: 220px;
+}
+.trend-window-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: linear-gradient(180deg, var(--bg-elevated), var(--bg-card));
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  user-select: none;
+  cursor: move;
+}
+.trend-handle {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+  padding: 0 2px;
+}
+.trend-handle:active {
+  cursor: grabbing;
+}
+.trend-title {
+  font-weight: 700;
+  color: var(--size-color, var(--gold));
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.trend-select-wrap,
+.trend-norm-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  margin-left: auto;
+}
+.trend-select-wrap {
+  margin-left: auto;
+}
+.trend-norm-wrap {
+  margin-left: 0;
+}
+.trend-select-wrap input,
+.trend-norm-wrap input {
+  cursor: pointer;
+  margin: 0;
+  accent-color: var(--size-color, var(--gold));
+}
+.trend-range-select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.trend-range-select:focus {
+  outline: none;
+  border-color: var(--size-color, var(--gold));
+}
+.trend-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 6px;
+  border-radius: 4px;
+  margin-left: 2px;
+}
+.trend-close-btn:hover {
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.1);
+}
+.trend-window-body {
+  flex: 1;
+  position: relative;
+  padding: 6px 8px 8px;
+  min-height: 0;
+}
+.trend-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+.trend-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, var(--size-color, var(--text-muted)) 50%, var(--size-color, var(--text-muted)) 60%, transparent 60%, transparent 70%, var(--size-color, var(--text-muted)) 70%, var(--size-color, var(--text-muted)) 80%, transparent 80%);
+  opacity: 0.5;
+}
+.trend-resize-handle:hover {
+  opacity: 1;
+}
+.trend-combined {
+  border-width: 2px;
+}
+.trend-combined .trend-title {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Mobile: stack library on top of canvas */
+@media (max-width: 720px) {
+  .trends-layout {
+    flex-direction: column;
+  }
+  .trends-library {
+    flex: 0 0 auto;
+  }
+  .trends-catalog {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .trend-source {
+    flex: 0 0 auto;
+  }
+  .trend-window {
+    min-width: 240px;
+  }
+}
+
 /* ====== Snake Xenzia Game ====== */
 .roi-section + .game-section {
   margin-top: 24px;

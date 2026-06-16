@@ -119,6 +119,9 @@ function attachListeners() {
 
   // Snake Xenzia game
   initSnakeGame();
+
+  // Trend Builder
+  initTrendBuilder();
 }
 
 function applyQuickRange(range) {
@@ -232,6 +235,9 @@ async function loadData() {
 
     // Calculator: refresh with latest data
     recalcCalculator();
+
+    // Trend Builder: load saved windows now that data is ready
+    loadTrendLayout();
   } catch (e) {
     console.error('Load failed', e);
   }
@@ -2020,5 +2026,578 @@ function updatePrediction() {
       <td class="pred-breakdown-pnl ${(sellTotals.base - totalBuyCost) >= 0 ? 'positive' : 'negative'}"><strong>${(sellTotals.base - totalBuyCost) >= 0 ? '+' : '−'}${idrP(Math.abs(sellTotals.base - totalBuyCost))}</strong></td>
     </tr>`;
     breakdownEl.style.display = 'block';
+  }
+}
+
+// ====== Trend Builder (Drag & Drop, PI Vision style) ======
+let TRENDS = [];
+let trendZIndex = 100;
+
+const TREND_COLORS = {
+  '0_5': '#a78bfa',
+  '1':   '#3b82f6',
+  '2':   '#06b6d4',
+  '3':   '#14b8a6',
+  '5':   '#10b981',
+  '10':  '#84cc16',
+  '25':  '#eab308',
+  '50':  '#f59e0b',
+  '100': '#f97316',
+  '250': '#ef4444',
+  '500': '#ec4899',
+  '1000': '#d4af37',
+};
+
+const RANGE_DAYS = {
+  '1m': 30, '3m': 90, '6m': 180, '1y': 365, '3y': 1095, '5y': 1825, 'all': null,
+};
+
+function formatTrendSize(sizeKey) {
+  const s = String(sizeKey).replace('_', '.');
+  if (s === '1000') return '1kg';
+  if (s.includes('.')) return s.replace('.', ',') + 'g';
+  return s + 'g';
+}
+
+function getTrendColor(sizeKey) {
+  return TREND_COLORS[sizeKey] || '#d4af37';
+}
+
+function getValidSizeKeys() {
+  return SIZES.map(s => String(s).replace('.', '_'));
+}
+
+function initTrendBuilder() {
+  // Setup catalog + canvas DnD + action buttons immediately (doesn't need data)
+  setupTrendCatalog();
+  setupTrendCanvas();
+  setupTrendActionButtons();
+  // Loading layout from storage happens after data loads (see loadData)
+}
+
+function setupTrendCatalog() {
+  const catalog = document.getElementById('trends-catalog');
+  if (!catalog) return;
+  catalog.innerHTML = SIZES.map(s => {
+    const sizeKey = String(s).replace('.', '_');
+    const color = getTrendColor(sizeKey);
+    return `<li class="trend-source" draggable="true" data-size="${sizeKey}" style="--size-color: ${color}">
+      <span class="trend-source-dot"></span>
+      <span class="trend-source-label">${formatTrendSize(sizeKey)}</span>
+    </li>`;
+  }).join('');
+  catalog.querySelectorAll('.trend-source').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', el.dataset.size);
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+  });
+}
+
+function setupTrendCanvas() {
+  const canvas = document.getElementById('trends-canvas');
+  if (!canvas) return;
+  canvas.addEventListener('dragover', e => {
+    e.preventDefault();
+    canvas.classList.add('drag-over');
+  });
+  canvas.addEventListener('dragleave', e => {
+    if (e.target === canvas) canvas.classList.remove('drag-over');
+  });
+  canvas.addEventListener('drop', e => {
+    e.preventDefault();
+    canvas.classList.remove('drag-over');
+    const sizeKey = e.dataTransfer.getData('text/plain');
+    if (!sizeKey) return;
+    const rect = canvas.getBoundingClientRect();
+    // Center window on drop point, with 240/30 offset (half of 480x320 minus header)
+    const x = e.clientX - rect.left - 240;
+    const y = e.clientY - rect.top - 30;
+    // Cascade: if there are existing windows, offset by 30px to avoid perfect overlap
+    const offset = TRENDS.length * 24;
+    addTrendWindow(sizeKey, Math.max(8, x + offset), Math.max(8, y + offset));
+  });
+}
+
+function setupTrendActionButtons() {
+  const combineBtn = document.getElementById('trend-combine-btn');
+  const resetBtn = document.getElementById('trend-reset-btn');
+  if (combineBtn) {
+    combineBtn.addEventListener('click', () => {
+      const selected = TRENDS.filter(t => t.selected && t.sizeKey !== 'combined');
+      if (selected.length < 2) return;
+      combineTrends(selected);
+    });
+  }
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (TRENDS.length === 0) return;
+      if (!confirm('Reset semua trend windows? Layout yang kesimpan akan dihapus.')) return;
+      TRENDS.forEach(t => {
+        if (t.chart) t.chart.destroy();
+        t.el.remove();
+      });
+      TRENDS = [];
+      showTrendCanvasEmpty();
+      updateTrendCombineButton();
+      try { localStorage.removeItem('antam-trends-layout'); } catch (e) {}
+    });
+  }
+}
+
+function addTrendWindow(sizeKey, x, y, opts = {}) {
+  const id = `trend-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const w = opts.w || 480;
+  const h = opts.h || 320;
+  const range = opts.range || '1y';
+  const normalized = !!opts.normalized;
+  const color = getTrendColor(sizeKey);
+
+  const el = document.createElement('div');
+  el.className = 'trend-window';
+  el.dataset.trendId = id;
+  el.dataset.size = sizeKey;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+  el.style.zIndex = ++trendZIndex;
+  el.style.setProperty('--size-color', color);
+  el.innerHTML = `
+    <div class="trend-window-header">
+      <span class="trend-handle" title="Drag to move">⋮⋮</span>
+      <span class="trend-title">${formatTrendSize(sizeKey)}</span>
+      <label class="trend-select-wrap" title="Tick buat combine"><input type="checkbox" class="trend-select-checkbox"> pick</label>
+      <select class="trend-range-select" title="Date range">
+        <option value="1m">1M</option>
+        <option value="3m">3M</option>
+        <option value="6m">6M</option>
+        <option value="1y">1Y</option>
+        <option value="3y">3Y</option>
+        <option value="5y">5Y</option>
+        <option value="all">All</option>
+      </select>
+      <label class="trend-norm-wrap" title="Re-base ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
+      <button class="trend-close-btn" title="Close">×</button>
+    </div>
+    <div class="trend-window-body">
+      <canvas class="trend-canvas"></canvas>
+    </div>
+    <div class="trend-resize-handle" title="Drag to resize">⇲</div>
+  `;
+  el.querySelector('.trend-range-select').value = range;
+  el.querySelector('.trend-norm-checkbox').checked = normalized;
+  if (opts.selected) el.querySelector('.trend-select-checkbox').checked = true;
+
+  document.getElementById('trends-canvas').appendChild(el);
+
+  const trend = { id, sizeKey, x, y, w, h, range, normalized, chart: null, el, selected: !!opts.selected };
+  TRENDS.push(trend);
+
+  setupTrendWindowInteractions(trend);
+  createTrendChart(trend);
+  hideTrendCanvasEmpty();
+  updateTrendCombineButton();
+  if (!opts.skipSave) saveTrendLayout();
+}
+
+function setupTrendWindowInteractions(trend) {
+  const el = trend.el;
+
+  // Bring to front on any mousedown inside the window
+  el.addEventListener('mousedown', () => {
+    el.style.zIndex = ++trendZIndex;
+  });
+
+  // Drag window (mousedown on header, but skip on form controls)
+  const header = el.querySelector('.trend-window-header');
+  header.addEventListener('mousedown', e => {
+    if (e.target.closest('button, select, input, label')) return;
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const origX = trend.x, origY = trend.y;
+    const onMove = e => {
+      const dx = e.clientX - startX, dy = e.clientY - startY;
+      trend.x = Math.max(0, origX + dx);
+      trend.y = Math.max(0, origY + dy);
+      el.style.left = trend.x + 'px';
+      el.style.top = trend.y + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      saveTrendLayout();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // Resize handle (bottom-right corner)
+  const resizeHandle = el.querySelector('.trend-resize-handle');
+  resizeHandle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX, startY = e.clientY;
+    const origW = trend.w, origH = trend.h;
+    const onMove = e => {
+      const dw = e.clientX - startX, dh = e.clientY - startY;
+      trend.w = Math.max(300, origW + dw);
+      trend.h = Math.max(220, origH + dh);
+      el.style.width = trend.w + 'px';
+      el.style.height = trend.h + 'px';
+      if (trend.chart) trend.chart.resize();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      saveTrendLayout();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // Close button
+  el.querySelector('.trend-close-btn').addEventListener('click', () => {
+    if (trend.chart) trend.chart.destroy();
+    el.remove();
+    TRENDS = TRENDS.filter(t => t.id !== trend.id);
+    showTrendCanvasEmpty();
+    updateTrendCombineButton();
+    saveTrendLayout();
+  });
+
+  // Range change
+  el.querySelector('.trend-range-select').addEventListener('change', e => {
+    trend.range = e.target.value;
+    createTrendChart(trend);
+    saveTrendLayout();
+  });
+
+  // Normalize toggle
+  el.querySelector('.trend-norm-checkbox').addEventListener('change', e => {
+    trend.normalized = e.target.checked;
+    createTrendChart(trend);
+    saveTrendLayout();
+  });
+
+  // Select checkbox
+  el.querySelector('.trend-select-checkbox').addEventListener('change', e => {
+    trend.selected = e.target.checked;
+    updateTrendCombineButton();
+  });
+}
+
+function getRecordsForTrendRange(range) {
+  if (!rawDates || !rawColumns || rawDates.length === 0) return [];
+  if (range === 'all' || !RANGE_DAYS[range]) {
+    const records = [];
+    for (let i = 0; i < rawDates.length; i++) {
+      const rec = { date: rawDates[i] };
+      for (const k in rawColumns) rec[k] = rawColumns[k][i];
+      records.push(rec);
+    }
+    return records;
+  }
+  const days = RANGE_DAYS[range];
+  const endDate = rawDates[rawDates.length - 1];
+  // Find start index by walking back `days` trading days
+  const startIdx = Math.max(0, rawDates.length - days);
+  const records = [];
+  for (let i = startIdx; i < rawDates.length; i++) {
+    const rec = { date: rawDates[i] };
+    for (const k in rawColumns) rec[k] = rawColumns[k][i];
+    records.push(rec);
+  }
+  return records;
+}
+
+function createTrendChart(trend) {
+  if (trend.chart) {
+    trend.chart.destroy();
+    trend.chart = null;
+  }
+  const records = getRecordsForTrendRange(trend.range);
+  if (!records.length) return;
+  const sizeKey = buildSizeKey(trend.sizeKey, 'sell');
+  const rawValues = records.map(r => r[sizeKey]).filter(v => v != null);
+  if (!rawValues.length) return;
+  const dates = records.map(r => r.date);
+
+  let data, yLabel, fillBg;
+  if (trend.normalized) {
+    const base = rawValues[0];
+    data = rawValues.map(v => (v / base) * 100);
+    yLabel = 'Index (100 = start)';
+    fillBg = true;
+  } else {
+    data = rawValues;
+    yLabel = 'Harga (Rp)';
+    fillBg = false;
+  }
+
+  const color = getTrendColor(trend.sizeKey);
+  const ctx = trend.el.querySelector('.trend-canvas');
+  trend.chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        label: formatTrendSize(trend.sizeKey),
+        data: data,
+        borderColor: color,
+        backgroundColor: color + '20',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        tension: 0.1,
+        fill: fillBg,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => trend.normalized
+              ? `${ctx.parsed.y.toFixed(2)} (${ctx.parsed.y >= 100 ? '+' : ''}${(ctx.parsed.y - 100).toFixed(1)}%)`
+              : 'Rp ' + ctx.parsed.y.toLocaleString('id-ID'),
+          },
+        },
+      },
+      scales: {
+        x: { type: 'time', time: { unit: 'month' }, ticks: { maxTicksLimit: 5, font: { size: 9 } }, grid: { display: false } },
+        y: {
+          ticks: {
+            maxTicksLimit: 4,
+            font: { size: 9 },
+            callback: v => trend.normalized ? v.toFixed(0) : 'Rp ' + (v / 1000).toFixed(0) + 'k',
+          },
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          title: { display: true, text: yLabel, font: { size: 9 }, color: '#9aa0a6' },
+        },
+      },
+    },
+  });
+}
+
+function updateTrendCombineButton() {
+  const selected = TRENDS.filter(t => t.selected && t.sizeKey !== 'combined');
+  const btn = document.getElementById('trend-combine-btn');
+  if (!btn) return;
+  btn.disabled = selected.length < 2;
+  btn.textContent = `🔗 Combine (${selected.length})`;
+}
+
+function combineTrends(trends) {
+  if (trends.length < 2) return;
+  // Use the most common range (just take first for now)
+  const range = trends[0].range;
+  const records = getRecordsForTrendRange(range);
+  if (!records.length) return;
+  const dates = records.map(r => r.date);
+  const allNormalized = trends.every(t => t.normalized);
+
+  const datasets = trends.map((t, i) => {
+    const sizeKey = buildSizeKey(t.sizeKey, 'sell');
+    let data = records.map(r => r[sizeKey]);
+    if (allNormalized && data[0]) {
+      const base = data[0];
+      data = data.map(v => v != null ? (v / base) * 100 : null);
+    }
+    const color = getTrendColor(t.sizeKey);
+    return {
+      label: formatTrendSize(t.sizeKey),
+      data: data,
+      borderColor: color,
+      backgroundColor: color + '15',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      tension: 0.1,
+      yAxisID: allNormalized ? 'y' : `y${i}`,
+      fill: false,
+    };
+  });
+
+  const scales = {
+    x: { type: 'time', time: { unit: 'month' }, ticks: { maxTicksLimit: 6, font: { size: 9 } }, grid: { display: false } },
+  };
+  if (allNormalized) {
+    scales.y = {
+      type: 'linear',
+      position: 'left',
+      title: { display: true, text: 'Index (100 = start)', font: { size: 9 }, color: '#9aa0a6' },
+      ticks: { maxTicksLimit: 5, font: { size: 9 } },
+      grid: { color: 'rgba(255,255,255,0.05)' },
+    };
+  } else {
+    trends.forEach((t, i) => {
+      const color = getTrendColor(t.sizeKey);
+      scales[`y${i}`] = {
+        type: 'linear',
+        position: i === 0 ? 'left' : 'right',
+        title: { display: true, text: formatTrendSize(t.sizeKey), font: { size: 9 }, color: color },
+        ticks: { maxTicksLimit: 4, font: { size: 8 }, callback: v => 'Rp ' + (v / 1000).toFixed(0) + 'k' },
+        grid: { drawOnChartArea: i === 0, color: 'rgba(255,255,255,0.05)' },
+      };
+    });
+  }
+
+  const id = `trend-combined-${Date.now()}`;
+  const x = 40, y = 40, w = 640, h = 400;
+  const el = document.createElement('div');
+  el.className = 'trend-window trend-combined';
+  el.dataset.trendId = id;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  el.style.width = w + 'px';
+  el.style.height = h + 'px';
+  el.style.zIndex = ++trendZIndex;
+  el.style.setProperty('--size-color', '#d4af37');
+  el.innerHTML = `
+    <div class="trend-window-header">
+      <span class="trend-handle">⋮⋮</span>
+      <span class="trend-title">🔗 Combined (${trends.length} sizes · ${allNormalized ? 'normalized' : 'multi-axis'})</span>
+      <button class="trend-close-btn">×</button>
+    </div>
+    <div class="trend-window-body">
+      <canvas class="trend-canvas"></canvas>
+    </div>
+    <div class="trend-resize-handle">⇲</div>
+  `;
+  document.getElementById('trends-canvas').appendChild(el);
+
+  const ctx = el.querySelector('.trend-canvas');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'top', labels: { boxWidth: 8, font: { size: 9 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const label = ctx.dataset.label || '';
+              const v = ctx.parsed.y;
+              if (allNormalized) return `${label}: ${v.toFixed(2)} (${v >= 100 ? '+' : ''}${(v - 100).toFixed(1)}%)`;
+              return `${label}: Rp ${v.toLocaleString('id-ID')}`;
+            },
+          },
+        },
+      },
+      scales,
+    },
+  });
+
+  const trend = { id, sizeKey: 'combined', x, y, w, h, range, normalized: allNormalized, chart, el, selected: false };
+  TRENDS.push(trend);
+
+  // Interactions for combined window: drag, resize, close (no range/normalize/pick)
+  el.addEventListener('mousedown', () => { el.style.zIndex = ++trendZIndex; });
+  const header = el.querySelector('.trend-window-header');
+  header.addEventListener('mousedown', e => {
+    if (e.target.closest('button, select, input, label')) return;
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY;
+    const origX = trend.x, origY = trend.y;
+    const onMove = e => {
+      trend.x = Math.max(0, origX + e.clientX - startX);
+      trend.y = Math.max(0, origY + e.clientY - startY);
+      el.style.left = trend.x + 'px';
+      el.style.top = trend.y + 'px';
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      saveTrendLayout();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  el.querySelector('.trend-resize-handle').addEventListener('mousedown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX, startY = e.clientY;
+    const origW = trend.w, origH = trend.h;
+    const onMove = e => {
+      trend.w = Math.max(380, origW + e.clientX - startX);
+      trend.h = Math.max(280, origH + e.clientY - startY);
+      el.style.width = trend.w + 'px';
+      el.style.height = trend.h + 'px';
+      chart.resize();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      saveTrendLayout();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  el.querySelector('.trend-close-btn').addEventListener('click', () => {
+    chart.destroy();
+    el.remove();
+    TRENDS = TRENDS.filter(t => t.id !== id);
+    showTrendCanvasEmpty();
+    saveTrendLayout();
+  });
+
+  hideTrendCanvasEmpty();
+  saveTrendLayout();
+}
+
+function hideTrendCanvasEmpty() {
+  document.getElementById('trends-canvas-empty')?.classList.add('hidden');
+}
+
+function showTrendCanvasEmpty() {
+  if (TRENDS.length === 0) {
+    document.getElementById('trends-canvas-empty')?.classList.remove('hidden');
+  }
+}
+
+function saveTrendLayout() {
+  const layout = TRENDS.map(t => ({
+    id: t.id,
+    sizeKey: t.sizeKey,
+    x: Math.round(t.x), y: Math.round(t.y), w: Math.round(t.w), h: Math.round(t.h),
+    range: t.range,
+    normalized: t.normalized,
+    selected: !!t.selected,
+  }));
+  try {
+    localStorage.setItem('antam-trends-layout', JSON.stringify(layout));
+  } catch (e) {
+    console.warn('localStorage save failed', e);
+  }
+}
+
+function loadTrendLayout() {
+  // Should only run after data is loaded
+  if (!allRecords || allRecords.length === 0) return;
+  const raw = localStorage.getItem('antam-trends-layout');
+  if (!raw) return;
+  try {
+    const layout = JSON.parse(raw);
+    if (!Array.isArray(layout) || layout.length === 0) return;
+    const valid = getValidSizeKeys();
+    layout.forEach(t => {
+      // Skip combined windows (can't reconstruct without re-running combine)
+      if (t.sizeKey === 'combined') return;
+      if (!valid.includes(t.sizeKey)) return;
+      addTrendWindow(t.sizeKey, t.x, t.y, {
+        w: t.w, h: t.h, range: t.range, normalized: t.normalized, selected: t.selected, skipSave: true,
+      });
+    });
+  } catch (e) {
+    console.warn('Failed to load trend layout', e);
+    try { localStorage.removeItem('antam-trends-layout'); } catch (_) {}
   }
 }
