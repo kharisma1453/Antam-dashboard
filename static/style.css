@@ -1428,6 +1428,9 @@ input[type="number"] {
 }
 
 /* ====== Snake Xenzia Game ====== */
+.roi-section + .game-section {
+  margin-top: 2px;
+}
 .game-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
