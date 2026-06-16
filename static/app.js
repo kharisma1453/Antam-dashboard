@@ -2351,15 +2351,11 @@ function populateCombinedLegend(trend) {
     item.className = 'trend-legend-item';
     item.style.setProperty('--size-color', color);
     item.dataset.size = sk;
+    item.title = `Klik kanan di trend untuk hapus ${formatTrendSize(sk)}`;
     item.innerHTML = `
       <span class="trend-legend-dot" style="background: ${color}"></span>
       <span class="trend-legend-label">${formatTrendSize(sk)}</span>
-      <button class="trend-legend-remove" title="Remove ${formatTrendSize(sk)}">×</button>
     `;
-    item.querySelector('.trend-legend-remove').addEventListener('click', (e) => {
-      e.stopPropagation();
-      removeSizeFromTrend(trend, sk);
-    });
     legendEl.appendChild(item);
   });
 }
@@ -2425,11 +2421,6 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
       <span class="trend-handle" title="Drag to move">⋮⋮</span>
       <span class="trend-title">${formatTrendSize(sizeKey)}</span>
       <label class="trend-select-wrap" title="Tick buat combine"><input type="checkbox" class="trend-select-checkbox"> pick</label>
-      <span class="trend-date-range">
-        <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
-        <span class="trend-date-sep">→</span>
-        <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
-      </span>
       <label class="trend-norm-wrap" title="Re-base ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn" title="Close">×</button>
     </div>
@@ -2437,7 +2428,13 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
       <div class="trend-chart-wrap">
         <canvas class="trend-canvas"></canvas>
       </div>
-      <div class="trend-legend"></div>
+    </div>
+    <div class="trend-window-footer">
+      <span class="trend-date-range">
+        <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
+        <span class="trend-date-sep">→</span>
+        <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
+      </span>
     </div>
     <div class="trend-resize-handle" title="Drag to resize">⇲</div>
   `;
@@ -2807,11 +2804,6 @@ function combineTrends(trends, opts = {}) {
     <div class="trend-window-header">
       <span class="trend-handle">⋮⋮</span>
       <span class="trend-title">🔗 Combined (${combinedSizes.length} sizes${allNormalized ? ' · normalized' : ''})</span>
-      <span class="trend-date-range">
-        <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
-        <span class="trend-date-sep">→</span>
-        <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
-      </span>
       <label class="trend-norm-wrap" title="Re-base semua size ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn">×</button>
     </div>
@@ -2819,6 +2811,13 @@ function combineTrends(trends, opts = {}) {
       <div class="trend-chart-wrap">
         <canvas class="trend-canvas"></canvas>
       </div>
+    </div>
+    <div class="trend-window-footer">
+      <span class="trend-date-range">
+        <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
+        <span class="trend-date-sep">→</span>
+        <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
+      </span>
       <div class="trend-legend"></div>
     </div>
     <div class="trend-resize-handle">⇲</div>

@@ -1727,6 +1727,34 @@ input[type="number"] {
   padding: 6px 8px 8px;
   min-height: 0;
 }
+.trend-window-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  min-height: 28px;
+}
+.trend-window-footer .trend-date-range {
+  margin-left: 0;
+  flex-shrink: 0;
+}
+.trend-window-footer .trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0;
+  border-top: none;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-height: 0;
+}
+.trend-window-footer .trend-legend:empty {
+  display: none;
+}
 .trend-chart-wrap {
   flex: 1;
   min-height: 0;
@@ -1738,6 +1766,8 @@ input[type="number"] {
   display: block;
 }
 .trend-legend {
+  /* When legend is in footer, it has its own rules above.
+     This is a fallback for any leftover in-body legend. */
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -1778,26 +1808,6 @@ input[type="number"] {
   font-weight: 600;
   color: var(--text);
 }
-.trend-legend-remove {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 14px;
-  line-height: 1;
-  padding: 0 4px;
-  margin-left: 2px;
-  border-radius: 50%;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.1s, color 0.1s, background 0.1s;
-}
-.trend-legend-item:hover .trend-legend-remove {
-  opacity: 1;
-}
-.trend-legend-remove:hover {
-  color: var(--red);
-  background: rgba(239, 68, 68, 0.15);
-}
 .trend-resize-handle {
   position: absolute;
   bottom: 0;
@@ -1820,8 +1830,8 @@ input[type="number"] {
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-/* In combined windows there's no .trend-select-wrap, so push date-range to the right */
-.trend-combined .trend-date-range {
+/* In combined windows there's no .trend-select-wrap, so push norm to the right */
+.trend-combined .trend-norm-wrap {
   margin-left: auto;
 }
 
