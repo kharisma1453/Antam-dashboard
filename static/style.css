@@ -1820,6 +1820,10 @@ input[type="number"] {
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+/* In combined windows there's no .trend-select-wrap, so push date-range to the right */
+.trend-combined .trend-date-range {
+  margin-left: auto;
+}
 
 /* Mobile: stack library on top of canvas */
 @media (max-width: 720px) {

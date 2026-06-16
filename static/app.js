@@ -2091,6 +2091,47 @@ function convertOldRangeToDateRange(oldRange) {
   return { startDate: last.toISOString().slice(0, 10), endDate: null };
 }
 
+// Auto-insert slashes as user types in a date input (mm/dd/yyyy mask)
+function autoFormatDateInput(input) {
+  input.addEventListener('input', () => {
+    let v = input.value.replace(/[^\d]/g, '');
+    if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+    if (v.length >= 6) v = v.slice(0, 5) + '/' + v.slice(5, 9);
+    if (v.length > 10) v = v.slice(0, 10);
+    input.value = v;
+  });
+}
+
+// Wire up start/end date inputs in a trend window header.
+// onChange callback fires when a valid date is entered (e.g. createTrendChart or rebuildCombinedChart)
+function setupTrendDateInputs(trend, startInput, endInput, onChange) {
+  function handleDateChange() {
+    const startStr = startInput.value.trim();
+    const endStr = endInput.value.trim();
+    const newStart = startStr ? parseMMDDYYYY(startStr) : null;
+    const newEnd = endStr ? parseMMDDYYYY(endStr) : null;
+    if (startStr && !newStart) startInput.classList.add('invalid');
+    else startInput.classList.remove('invalid');
+    if (endStr && !newEnd) endInput.classList.add('invalid');
+    else endInput.classList.remove('invalid');
+    if ((startStr && !newStart) || (endStr && !newEnd)) return;
+    trend.startDate = newStart;
+    trend.endDate = newEnd;
+    onChange();
+    saveTrendLayout();
+  }
+  autoFormatDateInput(startInput);
+  autoFormatDateInput(endInput);
+  startInput.addEventListener('change', handleDateChange);
+  endInput.addEventListener('change', handleDateChange);
+  startInput.addEventListener('blur', () => {
+    if (trend.startDate) startInput.value = formatMMDDYYYY(trend.startDate);
+  });
+  endInput.addEventListener('blur', () => {
+    if (trend.endDate) endInput.value = formatMMDDYYYY(trend.endDate);
+  });
+}
+
 function formatTrendSize(sizeKey) {
   const s = String(sizeKey).replace('_', '.');
   if (s === '1000') return '1kg';
@@ -2429,51 +2470,10 @@ function setupTrendWindowInteractions(trend) {
     saveTrendLayout();
   });
 
-  // Start/end date inputs
+  // Start/end date inputs (single trend)
   const startInput = el.querySelector('.trend-date-start');
   const endInput = el.querySelector('.trend-date-end');
-  function handleDateChange() {
-    const startStr = startInput.value.trim();
-    const endStr = endInput.value.trim();
-    const newStart = startStr ? parseMMDDYYYY(startStr) : null;
-    const newEnd = endStr ? parseMMDDYYYY(endStr) : null;
-    if (startStr && !newStart) {
-      startInput.classList.add('invalid');
-    } else {
-      startInput.classList.remove('invalid');
-    }
-    if (endStr && !newEnd) {
-      endInput.classList.add('invalid');
-    } else {
-      endInput.classList.remove('invalid');
-    }
-    if ((startStr && !newStart) || (endStr && !newEnd)) return; // don't redraw on invalid
-    trend.startDate = newStart;
-    trend.endDate = newEnd;
-    createTrendChart(trend);
-    saveTrendLayout();
-  }
-  // Auto-insert slashes as user types
-  function autoFormatDateInput(input) {
-    input.addEventListener('input', () => {
-      let v = input.value.replace(/[^\d]/g, '');
-      if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
-      if (v.length >= 6) v = v.slice(0, 5) + '/' + v.slice(5, 9);
-      if (v.length > 10) v = v.slice(0, 10);
-      input.value = v;
-    });
-  }
-  autoFormatDateInput(startInput);
-  autoFormatDateInput(endInput);
-  startInput.addEventListener('change', handleDateChange);
-  endInput.addEventListener('change', handleDateChange);
-  // Re-format on blur to canonical mm/dd/yyyy
-  startInput.addEventListener('blur', () => {
-    if (trend.startDate) startInput.value = formatMMDDYYYY(trend.startDate);
-  });
-  endInput.addEventListener('blur', () => {
-    if (trend.endDate) endInput.value = formatMMDDYYYY(trend.endDate);
-  });
+  setupTrendDateInputs(trend, startInput, endInput, () => createTrendChart(trend));
 
   // Normalize toggle
   el.querySelector('.trend-norm-checkbox').addEventListener('change', e => {
@@ -2590,26 +2590,23 @@ function updateTrendCombineButton() {
   btn.textContent = `🔗 Combine (${selected.length})`;
 }
 
-function combineTrends(trends, opts = {}) {
-  if (trends.length < 2) return;
-  // Use the first trend's date range (could be expanded to intersection later)
-  const startDate = opts.startDate !== undefined ? opts.startDate : (trends[0].startDate || null);
-  const endDate = opts.endDate !== undefined ? opts.endDate : (trends[0].endDate || null);
+// Build the Chart.js config (labels, datasets, scales) for a combined trend window.
+// Returns null if no records in range.
+function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized) {
   const records = getRecordsForTrendDateRange(startDate, endDate);
-  if (!records.length) return;
+  if (!records.length) return null;
   const dates = records.map(r => r.date);
-  const allNormalized = trends.every(t => t.normalized);
 
-  const datasets = trends.map((t, i) => {
-    const sizeKey = buildSizeKey(t.sizeKey, 'sell');
+  const datasets = combinedSizes.map((sk, i) => {
+    const sizeKey = buildSizeKey(sk, 'sell');
     let data = records.map(r => r[sizeKey]);
-    if (allNormalized && data[0]) {
+    if (normalized && data[0]) {
       const base = data[0];
       data = data.map(v => v != null ? (v / base) * 100 : null);
     }
-    const color = getTrendColor(t.sizeKey);
+    const color = getTrendColor(sk);
     return {
-      label: formatTrendSize(t.sizeKey),
+      label: formatTrendSize(sk),
       data: data,
       borderColor: color,
       backgroundColor: color + '15',
@@ -2617,7 +2614,7 @@ function combineTrends(trends, opts = {}) {
       pointRadius: 0,
       pointHoverRadius: 3,
       tension: 0.1,
-      yAxisID: allNormalized ? 'y' : `y${i}`,
+      yAxisID: normalized ? 'y' : `y${i}`,
       fill: false,
     };
   });
@@ -2625,7 +2622,7 @@ function combineTrends(trends, opts = {}) {
   const scales = {
     x: { type: 'time', time: { unit: 'month' }, ticks: { maxTicksLimit: 6, font: { size: 9 } }, grid: { display: false } },
   };
-  if (allNormalized) {
+  if (normalized) {
     scales.y = {
       type: 'linear',
       position: 'left',
@@ -2634,17 +2631,72 @@ function combineTrends(trends, opts = {}) {
       grid: { color: 'rgba(255,255,255,0.05)' },
     };
   } else {
-    trends.forEach((t, i) => {
-      const color = getTrendColor(t.sizeKey);
+    combinedSizes.forEach((sk, i) => {
+      const color = getTrendColor(sk);
       scales[`y${i}`] = {
         type: 'linear',
         position: i === 0 ? 'left' : 'right',
-        title: { display: true, text: formatTrendSize(t.sizeKey), font: { size: 9 }, color: color },
+        title: { display: true, text: formatTrendSize(sk), font: { size: 9 }, color: color },
         ticks: { maxTicksLimit: 4, font: { size: 8 }, callback: v => 'Rp ' + (v / 1000).toFixed(0) + 'k' },
         grid: { drawOnChartArea: i === 0, color: 'rgba(255,255,255,0.05)' },
       };
     });
   }
+
+  return { labels: dates, datasets, scales };
+}
+
+// Re-render a combined trend's chart (after date or normalize change)
+function rebuildCombinedChart(trend) {
+  const config = buildCombinedChartConfig(trend.startDate, trend.endDate, trend.combinedSizes, trend.normalized);
+  if (!config) {
+    if (trend.chart) { trend.chart.destroy(); trend.chart = null; }
+    return;
+  }
+  if (trend.chart) { trend.chart.destroy(); trend.chart = null; }
+  const ctx = trend.el.querySelector('.trend-canvas');
+  trend.chart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: config.labels, datasets: config.datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const label = ctx.dataset.label || '';
+              const v = ctx.parsed.y;
+              if (trend.normalized) return `${label}: ${v.toFixed(2)} (${v >= 100 ? '+' : ''}${(v - 100).toFixed(1)}%)`;
+              return `${label}: Rp ${v.toLocaleString('id-ID')}`;
+            },
+          },
+        },
+      },
+      scales: config.scales,
+    },
+  });
+  // Update title to reflect normalize mode
+  const titleEl = trend.el.querySelector('.trend-title');
+  if (titleEl) {
+    titleEl.textContent = `🔗 Combined (${trend.combinedSizes.length} sizes · ${trend.normalized ? 'normalized' : 'multi-axis'})`;
+  }
+}
+
+function combineTrends(trends, opts = {}) {
+  if (trends.length < 2) return;
+  // Use the first trend's date range (could be expanded to intersection later)
+  const startDate = opts.startDate !== undefined ? opts.startDate : (trends[0].startDate || null);
+  const endDate = opts.endDate !== undefined ? opts.endDate : (trends[0].endDate || null);
+  const allNormalized = trends.every(t => t.normalized);
+  const combinedSizes = trends.map(t => t.sizeKey);
+
+  // Validate that we have data
+  const testConfig = buildCombinedChartConfig(startDate, endDate, combinedSizes, allNormalized);
+  if (!testConfig) return;
 
   const id = `trend-combined-${Date.now()}`;
   const x = opts.x ?? 40, y = opts.y ?? 40, w = opts.w ?? 640, h = opts.h ?? 400;
@@ -2660,7 +2712,13 @@ function combineTrends(trends, opts = {}) {
   el.innerHTML = `
     <div class="trend-window-header">
       <span class="trend-handle">⋮⋮</span>
-      <span class="trend-title">🔗 Combined (${trends.length} sizes · ${allNormalized ? 'normalized' : 'multi-axis'})</span>
+      <span class="trend-title">🔗 Combined (${combinedSizes.length} sizes · ${allNormalized ? 'normalized' : 'multi-axis'})</span>
+      <span class="trend-date-range">
+        <input type="text" class="trend-date-input trend-date-start" placeholder="mm/dd/yyyy" maxlength="10" title="Start date">
+        <span class="trend-date-sep">→</span>
+        <input type="text" class="trend-date-input trend-date-end" placeholder="*" maxlength="10" title="End date (kosong = latest)">
+      </span>
+      <label class="trend-norm-wrap" title="Re-base semua size ke 100 dari titik pertama"><input type="checkbox" class="trend-norm-checkbox"> 100</label>
       <button class="trend-close-btn">×</button>
     </div>
     <div class="trend-window-body">
@@ -2671,41 +2729,35 @@ function combineTrends(trends, opts = {}) {
     </div>
     <div class="trend-resize-handle">⇲</div>
   `;
+  // Set initial input values
+  el.querySelector('.trend-date-start').value = startDate ? formatMMDDYYYY(startDate) : '';
+  el.querySelector('.trend-date-end').value = endDate ? formatMMDDYYYY(endDate) : '';
+  el.querySelector('.trend-norm-checkbox').checked = allNormalized;
+
   document.getElementById('trends-canvas').appendChild(el);
 
-  const ctx = el.querySelector('.trend-canvas');
-  const chart = new Chart(ctx, {
-    type: 'line',
-    data: { labels: dates, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const label = ctx.dataset.label || '';
-              const v = ctx.parsed.y;
-              if (allNormalized) return `${label}: ${v.toFixed(2)} (${v >= 100 ? '+' : ''}${(v - 100).toFixed(1)}%)`;
-              return `${label}: Rp ${v.toLocaleString('id-ID')}`;
-            },
-          },
-        },
-      },
-      scales,
-    },
-  });
-
-  const trend = { id, sizeKey: 'combined', combinedSizes: trends.map(t => t.sizeKey), x, y, w, h, startDate, endDate, normalized: allNormalized, chart, el, selected: false };
+  const trend = { id, sizeKey: 'combined', combinedSizes, x, y, w, h, startDate, endDate, normalized: allNormalized, chart: null, el, selected: false };
   TRENDS.push(trend);
+
+  // Build chart via helper
+  rebuildCombinedChart(trend);
 
   // Populate custom legend strip with × buttons per size
   populateCombinedLegend(trend);
 
-  // Interactions for combined window: drag, resize, close (no range/normalize/pick)
+  // Wire date inputs (uses trend.startDate/endDate and calls rebuildCombinedChart on change)
+  const startInput = el.querySelector('.trend-date-start');
+  const endInput = el.querySelector('.trend-date-end');
+  setupTrendDateInputs(trend, startInput, endInput, () => rebuildCombinedChart(trend));
+
+  // Wire normalize toggle
+  el.querySelector('.trend-norm-checkbox').addEventListener('change', e => {
+    trend.normalized = e.target.checked;
+    rebuildCombinedChart(trend);
+    saveTrendLayout();
+  });
+
+  // Drag window
   el.addEventListener('mousedown', () => { el.style.zIndex = ++trendZIndex; });
   const header = el.querySelector('.trend-window-header');
   header.addEventListener('mousedown', e => {
@@ -2737,7 +2789,7 @@ function combineTrends(trends, opts = {}) {
       trend.h = Math.max(280, origH + e.clientY - startY);
       el.style.width = trend.w + 'px';
       el.style.height = trend.h + 'px';
-      chart.resize();
+      if (trend.chart) trend.chart.resize();
     };
     const onUp = () => {
       document.removeEventListener('mousemove', onMove);
@@ -2748,7 +2800,7 @@ function combineTrends(trends, opts = {}) {
     document.addEventListener('mouseup', onUp);
   });
   el.querySelector('.trend-close-btn').addEventListener('click', () => {
-    chart.destroy();
+    if (trend.chart) trend.chart.destroy();
     el.remove();
     TRENDS = TRENDS.filter(t => t.id !== id);
     showTrendCanvasEmpty();
