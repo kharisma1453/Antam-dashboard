@@ -2583,15 +2583,13 @@ function createTrendChart(trend) {
   if (!rawValues.length) return;
   const dates = records.map(r => r.date);
 
-  let data, yLabel, fillBg;
+  let data, fillBg;
   if (trend.normalized) {
     const base = rawValues[0];
     data = rawValues.map(v => (v / base) * 100);
-    yLabel = 'Index (100 = start)';
     fillBg = true;
   } else {
     data = rawValues;
-    yLabel = 'Harga (Rp)';
     fillBg = false;
   }
 
@@ -2608,7 +2606,7 @@ function createTrendChart(trend) {
       callback: v => trend.normalized ? v.toFixed(0) : 'Rp ' + (v / 1000).toFixed(0) + 'k',
     },
     grid: { color: 'rgba(255,255,255,0.05)' },
-    title: { display: true, text: yLabel, font: { size: 9 }, color: '#9aa0a6' },
+    title: { display: false },
   };
   trend.chart = new Chart(ctx, {
     type: 'line',
@@ -2679,16 +2677,15 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
   });
 
   // Y-axis range: union of ALL sizes' data so every line is visible.
-  // yRefSize only controls the axis label + color (not the range).
-  let yMin, yMax, yLabel;
+  // yRefSize is still passed in (kept in scope) for any future use; currently
+  // the y-axis is unlabelled, so the only knob the user has is the range itself.
+  let yMin, yMax;
   if (normalized) {
     yMin = 50; yMax = 200;
-    yLabel = 'Index (100 = start)';
   } else if (customYMin != null && customYMax != null && customYMin < customYMax) {
     // User-set custom range
     yMin = customYMin;
     yMax = customYMax;
-    yLabel = `Harga (${formatTrendSize(yRefSize)})`;
   } else {
     // Find global min/max across every size's data
     let globalMin = Infinity, globalMax = -Infinity;
@@ -2707,10 +2704,8 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
     } else {
       yMin = 0; yMax = 1;
     }
-    yLabel = `Harga (${formatTrendSize(yRefSize)})`;
   }
 
-  const refColor = getTrendColor(yRefSize);
   const datasets = combinedSizes.map(sk => {
     const color = getTrendColor(sk);
     return {
@@ -2734,7 +2729,7 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
       position: 'left',
       min: yMin,
       max: yMax,
-      title: { display: true, text: yLabel, font: { size: 9 }, color: refColor },
+      title: { display: false },
       ticks: {
         maxTicksLimit: 5,
         font: { size: 9 },
