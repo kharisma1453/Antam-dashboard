@@ -581,22 +581,22 @@ input[type="date"]:focus {
 
 /* Daily table: cap height + vertical scroll (default 18-31 rows is too tall) */
 .daily-section .table-wrapper {
-  max-height: 600px;            /* ~15 rows visible */
-  overflow-y: auto;
+  max-height: 640px;            /* ~15 rows + header visible */
+  overflow-y: scroll;           /* always show track, not just on hover */
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
 /* Slim, dark scrollbar to match the theme */
 .daily-section .table-wrapper::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 .daily-section .table-wrapper::-webkit-scrollbar-track {
-  background: var(--bg-card);
+  background: var(--bg-elevated);
 }
 .daily-section .table-wrapper::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 4px;
+  border-radius: 5px;
 }
 .daily-section .table-wrapper::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
