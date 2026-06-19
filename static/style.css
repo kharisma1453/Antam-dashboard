@@ -376,7 +376,7 @@ input[type="date"]:focus {
 }
 
 /* ----- Chart ----- */
-.chart-section, .monthly-section {
+.chart-section, .monthly-section, .daily-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -392,7 +392,7 @@ input[type="date"]:focus {
   margin-bottom: 16px;
 }
 
-.chart-section h2, .monthly-section h2 {
+.chart-section h2, .monthly-section h2, .daily-section h2 {
   font-size: 16px;
   font-weight: 600;
 }
@@ -408,6 +408,13 @@ input[type="date"]:focus {
   align-items: flex-end;
   margin-bottom: 16px;
   gap: 16px;
+  flex-wrap: wrap;
+}
+
+.selector-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
   flex-wrap: wrap;
 }
 

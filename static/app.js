@@ -10,6 +10,8 @@ let showBuyback = true;
 let showSpreadFill = true;
 let availableYears = [];
 let currentYear = null;
+let currentDailyMonth = null;   // 'YYYY-MM'
+let currentDailySize = 1;        // grams
 // Columnar data (raw from data.json) — converted to row records on demand
 let rawDates = [];
 let rawColumns = {};
@@ -103,6 +105,16 @@ function attachListeners() {
   document.getElementById('year-selector').addEventListener('change', (e) => {
     currentYear = e.target.value;
     renderMonthly(allRecords);
+  });
+
+  // Daily table: month + size selectors
+  document.getElementById('daily-month-selector').addEventListener('change', (e) => {
+    currentDailyMonth = e.target.value;
+    renderDailyTableBody(currentDailyMonth, currentDailySize);
+  });
+  document.getElementById('daily-size-selector').addEventListener('change', (e) => {
+    currentDailySize = parseFloat(e.target.value);
+    renderDailyTableBody(currentDailyMonth, currentDailySize);
   });
 
   // Calculator listeners
@@ -228,6 +240,7 @@ async function loadData() {
     updateKPIs(summary);
     renderChart(records, getActiveSizes());
     renderMonthly(allRecords);
+    renderDailyTable(allRecords);
 
     // Highlight 1T button as active
     document.querySelectorAll('.quick-btn').forEach((b) => b.classList.remove('active'));
@@ -678,6 +691,91 @@ function renderMonthly(records) {
 
   // Render monthly trend chart (line chart of monthly averages)
   renderMonthlyTrend(monthlyAverages, currentYear);
+}
+
+// ----- Daily Table (sell + buyback per day, with month + size selectors) -----
+function renderDailyTable(records) {
+  // Group records by year-month
+  const byMonth = {};
+  records.forEach((r) => {
+    if (!r.date) return;
+    const ym = r.date.slice(0, 7);  // 'YYYY-MM'
+    if (!byMonth[ym]) byMonth[ym] = [];
+    byMonth[ym].push(r);
+  });
+
+  // 1. Build month dropdown (latest first)
+  const months = Object.keys(byMonth).sort().reverse();
+  const monthSel = document.getElementById('daily-month-selector');
+  if (months.length === 0) {
+    monthSel.innerHTML = '<option>— tidak ada data —</option>';
+    document.querySelector('#daily-table tbody').innerHTML = '';
+    document.getElementById('daily-summary').textContent = '—';
+    return;
+  }
+  const monthPick = (currentDailyMonth && months.includes(currentDailyMonth))
+    ? currentDailyMonth
+    : months[0];  // default: latest
+  currentDailyMonth = monthPick;
+  monthSel.innerHTML = months.map((m) => {
+    const [y, mo] = m.split('-');
+    const label = new Date(parseInt(y), parseInt(mo) - 1, 1)
+      .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+    return `<option value="${m}" ${m === monthPick ? 'selected' : ''}>${label}</option>`;
+  }).join('');
+
+  // 2. Build size dropdown
+  const sizeSel = document.getElementById('daily-size-selector');
+  const sizePick = SIZES.includes(currentDailySize) ? currentDailySize : 1;
+  currentDailySize = sizePick;
+  sizeSel.innerHTML = SIZES.map((s) => {
+    return `<option value="${s}" ${s === sizePick ? 'selected' : ''}>${formatSize(s)}g</option>`;
+  }).join('');
+
+  // 3. Render table body for current selection
+  renderDailyTableBody(currentDailyMonth, currentDailySize);
+}
+
+function renderDailyTableBody(monthKey, size) {
+  // Re-derive records from allRecords (re-group on demand)
+  if (!allRecords || allRecords.length === 0) return;
+  const byMonth = {};
+  allRecords.forEach((r) => {
+    if (!r.date) return;
+    const ym = r.date.slice(0, 7);
+    if (!byMonth[ym]) byMonth[ym] = [];
+    byMonth[ym].push(r);
+  });
+  const monthRecords = byMonth[monthKey] || [];
+
+  // Update headers to reflect size
+  const sizeLabel = formatSize(size);
+  document.getElementById('daily-sell-header').textContent = `Jual ${sizeLabel}g`;
+  document.getElementById('daily-buyback-header').textContent = `Buyback ${sizeLabel}g`;
+
+  // Update subtitle
+  const [y, mo] = monthKey.split('-');
+  const monthName = new Date(parseInt(y), parseInt(mo) - 1, 1)
+    .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  document.getElementById('daily-summary').textContent =
+    `${monthName} · ${monthRecords.length} hari trading · ${sizeLabel}g`;
+
+  // Render rows (newest first)
+  const sorted = monthRecords.slice().sort((a, b) => b.date.localeCompare(a.date));
+  const sellK = sellKey(size);
+  const buyK = buybackKey(size);
+  const tbody = document.querySelector('#daily-table tbody');
+  tbody.innerHTML = sorted.map((r) => {
+    const d = new Date(r.date);
+    const dateStr = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    const sell = r[sellK];
+    const buy = r[buyK];
+    return `<tr>
+      <td><strong>${dateStr}</strong></td>
+      <td style="color:var(--gold); font-weight:600;">${sell != null ? idr(sell) : '—'}</td>
+      <td>${buy != null ? idr(buy) : '—'}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderMonthlyTrend(monthlyAverages, year) {
