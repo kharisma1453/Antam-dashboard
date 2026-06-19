@@ -16,6 +16,8 @@ import requests
 import json
 import csv
 import os
+import sys
+import time
 from datetime import datetime
 
 TODAY = datetime.now().strftime("%Y-%m-%d")
@@ -58,22 +60,52 @@ COL_NAMES = {
 BUY_COL_NAMES = {s: c.replace("_idr", "_buyback_idr") for s, c in COL_NAMES.items()}
 
 
-def fetch_rohmats_history(url):
-    """Download and parse the full daily history from rohmats repo."""
-    print(f"📥 Downloading {url.split('/')[-1]}...")
-    r = requests.get(url, timeout=30)
-    r.raise_for_status()
-    data = json.loads(r.text)
-    print(f"✅ Got {len(data):,} data points")
+def fetch_rohmats_history(url, max_retries=3, retry_delay=1800):
+    """
+    Download and parse the full daily history from rohmats repo.
 
-    # Convert to {date: price_1g}
-    daily = {}
-    for ts, price in data:
-        date = datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d")
-        daily[date] = price
+    Retries on HTTP 404 (upstream file not yet published — common on cron
+    runs that beat rohmats's 05:00 WIB scrape + GitHub propagation).
+    - 200: returns {date: price_1g} dict
+    - 404 after all retries: returns {} (caller should skip the update cleanly)
+    - other HTTP error / network: raises (cron should fail loud)
+    """
+    filename = url.split('/')[-1]
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"📥 [attempt {attempt}/{max_retries}] Downloading {filename}...")
+            r = requests.get(url, timeout=30)
+            if r.status_code == 200:
+                data = json.loads(r.text)
+                print(f"✅ Got {len(data):,} data points")
+                daily = {}
+                for ts, price in data:
+                    date = datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d")
+                    daily[date] = price
+                print(f"📅 Date range: {min(daily.keys())} → {max(daily.keys())} ({len(daily)} days)")
+                return daily
+            elif r.status_code == 404:
+                if attempt < max_retries:
+                    wait_min = retry_delay // 60
+                    print(f"⏳ 404 — upstream not yet published, sleeping {wait_min} min before retry...")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"⚠️  404 after {max_retries} attempts — upstream still not published.")
+                    return {}
+            else:
+                # 5xx, 403, etc. — treat as fatal
+                r.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries:
+                wait_min = retry_delay // 60
+                print(f"❌ Network error: {e}. Retrying in {wait_min} min...")
+                time.sleep(retry_delay)
+            else:
+                print(f"❌ Network error after {max_retries} attempts: {e}")
+                raise
 
-    print(f"📅 Date range: {min(daily.keys())} → {max(daily.keys())} ({len(daily)} days)")
-    return daily
+    # Should never reach here, but keep mypy/linter happy
+    return {}
 
 
 def fill_missing_dates(daily, start_date="2025-01-01", end_date="2026-06-14"):
@@ -241,8 +273,17 @@ def main():
     # 1. Download sell history
     sell_daily = fetch_rohmats_history(ROHMATS_SELL_URL)
 
-    # 2. Download buyback history
+    # 2. Download buyback history (independent retry; if also 404, fallback to sell×0.92)
     buy_daily = fetch_rohmats_history(ROHMATS_BUY_URL)
+
+    # 2a. If sell is empty, exit cleanly so cron skips today's update without error
+    if not sell_daily:
+        print("\n🛑 No new sell data after all retries. Skipping today's update (will retry on next cron).")
+        sys.exit(0)
+
+    # 2b. If buyback is empty but sell succeeded, fallback to sell×0.92 (already handled in merge_sell_buy)
+    if not buy_daily:
+        print("\n⚠️  No new buyback data — will estimate from sell × 0.92 for missing dates.")
 
     # 3. Fill missing dates in our range
     sell_end = max(sell_daily.keys()) if sell_daily else TODAY
