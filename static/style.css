@@ -581,7 +581,7 @@ input[type="date"]:focus {
 
 /* Daily table: cap height + vertical scroll (default 18-31 rows is too tall) */
 .daily-section .table-wrapper {
-  max-height: 640px;            /* ~15 rows + header visible */
+  max-height: 680px;            /* ~15 rows + header visible (row height ~42px) */
   overflow-y: scroll;           /* always show track, not just on hover */
   border: 1px solid var(--border);
   border-radius: 8px;
