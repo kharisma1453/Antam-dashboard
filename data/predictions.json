@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-22T18:00:53.536745Z",
+  "generated_at": "2026-06-23T02:00:06.419119Z",
   "model": "HoltWinters(additive trend, log-space)",
   "library": "statsmodels",
   "training_range": {
