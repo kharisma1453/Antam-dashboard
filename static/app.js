@@ -2613,7 +2613,7 @@ function addTrendWindow(sizeKey, x, y, opts = {}) {
 
   document.getElementById('trends-canvas').appendChild(el);
 
-  const trend = { id, sizeKey, x, y, w, h, startDate, endDate, normalized, yMin: opts.yMin != null ? opts.yMin : null, yMax: opts.yMax != null ? opts.yMax : null, chart: null, el };
+  const trend = { id, sizeKey, x, y, w, h, startDate, endDate, normalized, dots: true, yMin: opts.yMin != null ? opts.yMin : null, yMax: opts.yMax != null ? opts.yMax : null, chart: null, el };
   TRENDS.push(trend);
 
   setupTrendWindowInteractions(trend);
@@ -2772,7 +2772,7 @@ function createTrendChart(trend) {
         borderColor: color,
         backgroundColor: color + '20',
         borderWidth: 1.5,
-        pointRadius: 0,
+        pointRadius: trend.dots ? 2.5 : 0,
         pointHoverRadius: 3,
         tension: 0.1,
         fill: fillBg,
@@ -2802,7 +2802,7 @@ function createTrendChart(trend) {
 
 // Build the Chart.js config (labels, datasets, scales) for a combined trend window.
 // All sizes share a single y-axis. Returns null if no records in range.
-function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized, customYMin = null, customYMax = null) {
+function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized, customYMin = null, customYMax = null, dots = true) {
   const records = getRecordsForTrendDateRange(startDate, endDate);
   if (!records.length) return null;
   const dates = records.map(r => r.date);
@@ -2858,7 +2858,7 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
       borderColor: color,
       backgroundColor: color + '15',
       borderWidth: 1.5,
-      pointRadius: 0,
+      pointRadius: dots ? 2.5 : 0,
       pointHoverRadius: 3,
       tension: 0.1,
       yAxisID: 'y',
@@ -2888,7 +2888,7 @@ function buildCombinedChartConfig(startDate, endDate, combinedSizes, normalized,
 
 // Re-render a combined trend's chart (after date, normalize, or y-range change)
 function rebuildCombinedChart(trend) {
-  const config = buildCombinedChartConfig(trend.startDate, trend.endDate, trend.combinedSizes, trend.normalized, trend.yMin, trend.yMax);
+  const config = buildCombinedChartConfig(trend.startDate, trend.endDate, trend.combinedSizes, trend.normalized, trend.yMin, trend.yMax, trend.dots);
   if (!config) {
     if (trend.chart) { trend.chart.destroy(); trend.chart = null; }
     return;
@@ -3111,6 +3111,12 @@ function showTrendContextMenu(trend, clientX, clientY) {
   html += `<div class="trend-context-item" data-action="toggle-norm">
     <span class="trend-context-label-left">📐 Normalize (100)</span>
     <span class="trend-context-check ${trend.normalized ? 'checked' : ''}">${trend.normalized ? '✓' : ''}</span>
+  </div>`;
+
+  // Dots toggle
+  html += `<div class="trend-context-item" data-action="toggle-dots">
+    <span class="trend-context-label-left">⚫ Show dots</span>
+    <span class="trend-context-check ${trend.dots ? 'checked' : ''}">${trend.dots ? '✓' : ''}</span>
   </div>`;
 
   // Y-axis range (single + combined). Disabled when normalized (range fixed at 50-200).
@@ -3424,6 +3430,17 @@ function handleContextAction(trend, action, item, menu) {
       } else {
         const normCb = trend.el.querySelector('.trend-norm-checkbox');
         if (normCb) normCb.checked = trend.normalized;
+        createTrendChart(trend);
+      }
+      saveTrendLayout();
+      hideTrendContextMenu();
+      break;
+    }
+    case 'toggle-dots': {
+      trend.dots = !trend.dots;
+      if (trend.sizeKey === 'combined') {
+        rebuildCombinedChart(trend);
+      } else {
         createTrendChart(trend);
       }
       saveTrendLayout();
